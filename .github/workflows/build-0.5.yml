@@ -115,6 +115,34 @@ jobs:
           PY
           grep -q '^mod_version=0.5.2-alpha$' "$PROJECT_DIR/gradle.properties"
 
+      - name: Apply 0.5.3 Inventory Panel parity
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, zlib
+          encoded = Path('patches/0.5.3/inventory_panel_parity.patch.zlib.b64').read_text().strip()
+          Path('/tmp/inventory_panel_parity.patch').write_bytes(zlib.decompress(base64.b64decode(encoded)))
+          PY
+          patch -d "$PROJECT_DIR" -p1 < /tmp/inventory_panel_parity.patch
+          python - "$PROJECT_DIR" "$GITHUB_WORKSPACE/EnderIO-1.12.2-5.3.72.jar" <<'PY'
+          from pathlib import Path
+          import sys, zipfile
+          root=Path(sys.argv[1])
+          jar=sys.argv[2]
+          targets = {
+              'assets/enderio/textures/gui/40/inv_panel.png': 'inv_panel.png',
+              'assets/enderio/textures/gui/40/inv_panel_extended.png': 'inv_panel_extended.png',
+          }
+          out = root/'src/main/resources/assets/loyacrowns_ender_legacy/textures/gui'
+          out.mkdir(parents=True, exist_ok=True)
+          with zipfile.ZipFile(jar) as z:
+              for source, name in targets.items():
+                  (out/name).write_bytes(z.read(source))
+          print('Restored exact Ender IO 5.3.72 Inventory Panel GUI textures.')
+          PY
+          grep -q '^mod_version=0.5.3-alpha$' "$PROJECT_DIR/gradle.properties"
+
       - name: Prepare Forge build
         shell: bash
         run: |
@@ -146,7 +174,7 @@ jobs:
           cd "$PROJECT_DIR"
           gradle --no-daemon clean build --stacktrace
 
-      - name: Validate 0.5.2 JAR
+      - name: Validate 0.5.3 JAR
         shell: bash
         run: |
           JAR="$(find "$PROJECT_DIR/build/libs" -maxdepth 1 -type f -name 'LoyalCrowns-Ender-Legacy-*.jar' ! -name '*sources*' -print -quit)"
@@ -157,14 +185,20 @@ jobs:
           grep -q 'com/loyacrown/enderlegacy/menu/DimensionalTransceiverMenu.class' /tmp/jar-contents.txt
           grep -q 'com/loyacrown/enderlegacy/client/DimensionalTransceiverScreen.class' /tmp/jar-contents.txt
           grep -q 'com/loyacrown/enderlegacy/blockentity/DimensionalTransceiverBlockEntity.class' /tmp/jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/menu/InventoryPanelMenu.class' /tmp/jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/client/InventoryPanelScreen.class' /tmp/jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/network/LegacyNetwork.class' /tmp/jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/network/InventoryPanelFilterPacket.class' /tmp/jar-contents.txt
           grep -q 'assets/loyacrowns_ender_legacy/textures/gui/farm_station.png' /tmp/jar-contents.txt
           grep -q 'assets/loyacrowns_ender_legacy/textures/gui/transceiver_general.png' /tmp/jar-contents.txt
           grep -q 'assets/loyacrowns_ender_legacy/textures/gui/transceiver_channel_select.png' /tmp/jar-contents.txt
-          unzip -p "$JAR" META-INF/mods.toml | grep -q 'version="0.5.2-alpha"'
-          echo '0.5.2 Farming Station + Dimensional Transceiver parity pass validated.'
+          grep -q 'assets/loyacrowns_ender_legacy/textures/gui/inv_panel.png' /tmp/jar-contents.txt
+          grep -q 'assets/loyacrowns_ender_legacy/textures/gui/inv_panel_extended.png' /tmp/jar-contents.txt
+          unzip -p "$JAR" META-INF/mods.toml | grep -q 'version="0.5.3-alpha"'
+          echo '0.5.3 Inventory Panel + Farming Station + Dimensional Transceiver parity pass validated.'
 
       - uses: actions/upload-artifact@v4
         with:
-          name: LoyalCrowns-Ender-Legacy-1.20.1-0.5.2-alpha
+          name: LoyalCrowns-Ender-Legacy-1.20.1-0.5.3-alpha
           path: ${{ env.PROJECT_DIR }}/build/libs/*.jar
           if-no-files-found: error
