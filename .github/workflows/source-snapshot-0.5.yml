@@ -1,4 +1,4 @@
-name: Prepare 0.5.0 Source Snapshot
+name: Prepare 0.5.x Source Snapshot
 
 on:
   workflow_dispatch:
@@ -77,16 +77,77 @@ jobs:
           python patches/0.4.0/fix_simple_crafter.py "$PROJECT_DIR"
           grep -q '^mod_version=0.4.0-alpha$' "$PROJECT_DIR/gradle.properties"
 
+      - name: Apply 0.5.0 Farming Station GUI pass
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, zlib
+          encoded = Path('patches/0.5.0/farming_gui.patch.zlib.b64').read_text().strip()
+          Path('/tmp/farming_gui.patch').write_bytes(zlib.decompress(base64.b64decode(encoded)))
+          PY
+          patch -d "$PROJECT_DIR" -p2 < /tmp/farming_gui.patch
+          python patches/0.5.0/fix_client_menu_registration.py "$PROJECT_DIR"
+          python - "$PROJECT_DIR" "$GITHUB_WORKSPACE/EnderIO-1.12.2-5.3.72.jar" <<'PY'
+          from pathlib import Path
+          import sys, zipfile
+          root=Path(sys.argv[1])
+          jar=sys.argv[2]
+          source='assets/enderio/textures/gui/40/farm_station.png'
+          target=root/'src/main/resources/assets/loyacrowns_ender_legacy/textures/gui/farm_station.png'
+          target.parent.mkdir(parents=True, exist_ok=True)
+          with zipfile.ZipFile(jar) as z:
+              target.write_bytes(z.read(source))
+          PY
+
+      - name: Apply 0.5.1 Farming Station behavior pass
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, zlib
+          encoded = Path('patches/0.5.1/farming_deep_parity.patch.zlib.b64').read_text().strip()
+          Path('/tmp/farming_deep_parity.patch').write_bytes(zlib.decompress(base64.b64decode(encoded)))
+          PY
+          patch -d "$PROJECT_DIR" -p2 < /tmp/farming_deep_parity.patch
+
+      - name: Apply 0.5.2 Dimensional Transceiver parity pass
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, zlib
+          encoded = Path('patches/0.5.2/transceiver_parity.patch.zlib.b64').read_text().strip()
+          Path('/tmp/transceiver_parity.patch').write_bytes(zlib.decompress(base64.b64decode(encoded)))
+          PY
+          patch -d "$PROJECT_DIR" -p2 < /tmp/transceiver_parity.patch
+          python - "$PROJECT_DIR" "$GITHUB_WORKSPACE/EnderIO-1.12.2-5.3.72.jar" <<'PY'
+          from pathlib import Path
+          import sys, zipfile
+          root=Path(sys.argv[1])
+          jar=sys.argv[2]
+          targets = {
+              'assets/enderio/textures/gui/40/transceiver_general.png': 'transceiver_general.png',
+              'assets/enderio/textures/gui/40/transceiver_channel_select.png': 'transceiver_channel_select.png',
+          }
+          out = root/'src/main/resources/assets/loyacrowns_ender_legacy/textures/gui'
+          out.mkdir(parents=True, exist_ok=True)
+          with zipfile.ZipFile(jar) as z:
+              for source, name in targets.items():
+                  (out/name).write_bytes(z.read(source))
+          PY
+          grep -q '^mod_version=0.5.2-alpha$' "$PROJECT_DIR/gradle.properties"
+
       - name: Package reconstructed source
         shell: bash
         run: |
-          cp -R "$PROJECT_DIR" LoyalCrowns-Ender-Legacy-0.5-worktree
-          rm -rf LoyalCrowns-Ender-Legacy-0.5-worktree/build LoyalCrowns-Ender-Legacy-0.5-worktree/.gradle
-          zip -qr LoyalCrowns-Ender-Legacy-1.20.1-0.5.0-dev-source.zip LoyalCrowns-Ender-Legacy-0.5-worktree
+          cp -R "$PROJECT_DIR" LoyalCrowns-Ender-Legacy-0.5.2-worktree
+          rm -rf LoyalCrowns-Ender-Legacy-0.5.2-worktree/build LoyalCrowns-Ender-Legacy-0.5.2-worktree/.gradle
+          zip -qr LoyalCrowns-Ender-Legacy-1.20.1-0.5.2-dev-source.zip LoyalCrowns-Ender-Legacy-0.5.2-worktree
 
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: LoyalCrowns-Ender-Legacy-1.20.1-0.5.0-dev-source
-          path: LoyalCrowns-Ender-Legacy-1.20.1-0.5.0-dev-source.zip
+          name: LoyalCrowns-Ender-Legacy-1.20.1-0.5.2-dev-source
+          path: LoyalCrowns-Ender-Legacy-1.20.1-0.5.2-dev-source.zip
           if-no-files-found: error
