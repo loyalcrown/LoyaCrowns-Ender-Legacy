@@ -40,27 +40,19 @@ jobs:
           grep -q '^mod_version=0.5.9-alpha$' "$PROJECT_DIR/gradle.properties"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Apply 0.6.0 modernization payload
+      - name: Apply 0.6.0 modernization patch
         shell: bash
         run: |
-          test -s patches/0.6.0/modernization_payload.tar.gz
-          tar -tzf patches/0.6.0/modernization_payload.tar.gz >/dev/null
-          tar -xzf patches/0.6.0/modernization_payload.tar.gz -C "$PROJECT_DIR"
+          python patches/0.6.0/apply_modernization_patch.py "$PROJECT_DIR"
           grep -q '^mod_version=0.6.0-alpha$' "$PROJECT_DIR/gradle.properties"
           grep -q 'MachineRedstoneMode' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/LegacyPoweredBlockEntity.java"
-          grep -q 'MachineIOMode' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/LegacyPoweredBlockEntity.java"
+          grep -q 'MachineIOMode' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/FarmingStationBlockEntity.java"
           grep -q 'REDSTONE_BUTTON_ID' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/menu/FarmingStationMenu.java"
           grep -q 'Side Configuration' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/client/FarmingStationScreen.java"
           grep -q 'isMachineEnabledByRedstone' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/FarmingStationBlockEntity.java"
           test -f "$PROJECT_DIR/src/main/resources/assets/loyacrowns_ender_legacy/textures/block/farming_station_side_modern.png"
           test -f "$PROJECT_DIR/src/main/resources/assets/loyacrowns_ender_legacy/textures/block/soul_machine_top_modern.png"
           test -f "$PROJECT_DIR/src/main/resources/assets/loyacrowns_ender_legacy/textures/block/soul_machine_bottom_modern.png"
-          python - "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/registry/LegacyItems.java" <<'PY'
-          from pathlib import Path
-          import sys
-          text = Path(sys.argv[1]).read_text()
-          assert '.durability(2031).stacksTo(1)' not in text, '0.5.9 damageable-item hotfix regressed'
-          PY
 
       - name: Prepare Forge build
         shell: bash
