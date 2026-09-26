@@ -1,0 +1,56 @@
+ingots/iron'},'P':{'item':'minecraft:piston'},'S':{'item':'minecraft:stone_pressure_plate'},'R':{'item':'minecraft:redstone'}},
+ 'result':{'item':'loyacrowns_ender_legacy:exit_rail','count':6},'show_notification':True})
+writej(recipes/'advanced_power_monitor.json',{
+ 'type':'minecraft:crafting_shaped','category':'misc','pattern':['WWW','WPW','RYG'],
+ 'key':{'W':{'item':'minecraft:black_wool'},'P':{'item':'loyacrowns_ender_legacy:power_monitor'},'R':{'item':'minecraft:red_dye'},'Y':{'item':'minecraft:yellow_dye'},'G':{'item':'minecraft:green_dye'}},
+ 'result':{'item':'loyacrowns_ender_legacy:advanced_power_monitor'},'show_notification':True})
+
+# Asset validation script catches missing textures/models before a JAR is published.
+tools=root/'tools'; tools.mkdir(exist_ok=True)
+(tools/'validate_assets.py').write_text(r'''from pathlib import Path
+import json, sys
+
+ROOT = Path(__file__).resolve().parents[1] / 'src/main/resources/assets/loyacrowns_ender_legacy'
+errors=[]
+
+def load(path):
+    try:
+        return json.loads(path.read_text())
+    except Exception as e:
+        errors.append(f'{path.relative_to(ROOT)}: invalid JSON: {e}')
+        return None
+
+def walk_strings(obj, key=None):
+    if isinstance(obj, dict):
+        for k,v in obj.items():
+            yield from walk_strings(v,k)
+    elif isinstance(obj, list):
+        for v in obj: yield from walk_strings(v,key)
+    elif isinstance(obj,str):
+        yield key,obj
+
+for path in list((ROOT/'blockstates').glob('*.json')) + list((ROOT/'models').rglob('*.json')):
+    obj=load(path)
+    if obj is None: continue
+    for key,value in walk_strings(obj):
+        if key == 'model' and value.startswith('loyacrowns_ender_legacy:'):
+            rel=value.split(':',1)[1]
+            candidate=ROOT/'models'/(rel+'.json')
+            if not candidate.exists(): errors.append(f'{path.relative_to(ROOT)} -> missing model {candidate.relative_to(ROOT)}')
+        if key == 'parent' and value.startswith('loyacrowns_ender_legacy:'):
+            rel=value.split(':',1)[1]
+            candidate=ROOT/'models'/(rel+'.json')
+            if not candidate.exists(): errors.append(f'{path.relative_to(ROOT)} -> missing parent {candidate.relative_to(ROOT)}')
+        if key not in {'model','parent'} and value.startswith('loyacrowns_ender_legacy:block/'):
+            rel=value.split(':',1)[1].replace('block/','',1)
+            candidate=ROOT/'textures/block'/(rel+'.png')
+            if not candidate.exists(): errors.append(f'{path.relative_to(ROOT)} -> missing texture {candidate.relative_to(ROOT)}')
+
+if errors:
+    print('\n'.join(errors))
+    sys.exit(1)
+print('Asset validation passed: every LoyalCrown model/texture reference resolves.')
+''')
+
+# Reference audit from the supplied 1.12.2 JAR.
+(root/'REFERENCE_1_12_2.md').write_text('''# Ender IO 1.12.2 reference\n\nReference JAR: `EnderIO-1.12.2-5.3.72.jar`. The addon still targets Minecraft 1.20.1 / Forge 47.4.x / Ender IO 6.2.15-beta; no 1.12 bytecode is loaded at runtime.\n\n## 0.2.0-alpha first-pass changes\n\n- Dark Steel Anvil now uses the correct anvil geometry and exact 1.12.2 body/top artwork.\n- Ender Rail now has complete rail-state models and its original 1.7.10 artwork (the block itself was removed before Ender IO 5.3.72).\n- Added the 1.12.2 Exit Rail with exact 5.3.72 texture and ported eject/destroy behavior.\n- Added the 1.12.2 Graphical Power Monitor using the existing 1.20 power-monitor logic plus the 5.3.72 animated screen/frame artwork.\n- Farming Station, Reservoir, Combustion Generator, Power Monitor, Dimensional Transceiver, and Photovoltaic cells now preferentially use exact 5.3.72 textures where practical.\n- Added automated resource-reference validation so missing model/texture paths fail CI instead of becoming purple/black blocks in game.\n\n## Still queued from 5.3.72\n\nThe 1.12.2 reference also contains removed machines and systems such as the Ender Generator, Frank'n'Zombie Generator, Lava Generator, enhanced machine variants, Inventor
