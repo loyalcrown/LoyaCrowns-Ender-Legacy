@@ -1,0 +1,70 @@
+name: Prepare 0.5.8 Source Snapshot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "dev/final-parity-0.5.0" ]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download validated 0.5.7 source snapshot
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/source-artifact
+          gh run download 36264531028 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name LoyalCrowns-Ender-Legacy-1.20.1-0.5.7-dev-source \
+            --dir /tmp/source-artifact
+          SOURCE_ZIP="$(find /tmp/source-artifact -type f -name '*0.5.7-dev-source.zip' -print -quit)"
+          test -n "$SOURCE_ZIP"
+          unzip -q "$SOURCE_ZIP"
+          PROJECT_DIR="$(find . -maxdepth 2 -type f -name gradle.properties -path '*0.5.7-worktree*' -printf '%h\n' | head -1)"
+          test -n "$PROJECT_DIR"
+          grep -q '^mod_version=0.5.7-alpha$' "$PROJECT_DIR/gradle.properties"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Apply 0.5.8 Return / Storage Area parity pass
+        shell: bash
+        run: |
+          cat patches/0.5.8/inventory_return_storage.b64.part1 \
+              patches/0.5.8/inventory_return_storage.b64.part2 \
+              patches/0.5.8/inventory_return_storage.b64.part3 \
+              patches/0.5.8/inventory_return_storage.b64.part4 \
+              > /tmp/inventory_return_storage.b64
+          python - <<'PY'
+          from pathlib import Path
+          import base64, hashlib, zlib
+          encoded = Path('/tmp/inventory_return_storage.b64').read_text().replace('\n','').strip()
+          decoded = zlib.decompress(base64.b64decode(encoded, validate=True))
+          assert hashlib.sha256(decoded).hexdigest() == '40155f487c635f7f70dd9120dae8f1b723b3ad75f2cf6d3eebfb7e9006a357d0'
+          Path('/tmp/inventory_return_storage.patch').write_bytes(decoded)
+          PY
+          patch -d "$PROJECT_DIR" -p1 < /tmp/inventory_return_storage.patch
+          grep -q '^mod_version=0.5.8-alpha$' "$PROJECT_DIR/gradle.properties"
+          grep -q 'RETURN_STORAGE_SLOTS = 15' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/InventoryPanelBlockEntity.java"
+          grep -q 'ExtractionDisabled' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/InventoryPanelBlockEntity.java"
+          grep -q 'isLocalStorageMode' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/menu/InventoryPanelMenu.java"
+
+      - name: Package reconstructed source
+        shell: bash
+        run: |
+          cp -R "$PROJECT_DIR" LoyalCrowns-Ender-Legacy-0.5.8-worktree
+          rm -rf LoyalCrowns-Ender-Legacy-0.5.8-worktree/build LoyalCrowns-Ender-Legacy-0.5.8-worktree/.gradle
+          zip -qr LoyalCrowns-Ender-Legacy-1.20.1-0.5.8-dev-source.zip LoyalCrowns-Ender-Legacy-0.5.8-worktree
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: LoyalCrowns-Ender-Legacy-1.20.1-0.5.8-dev-source
+          path: LoyalCrowns-Ender-Legacy-1.20.1-0.5.8-dev-source.zip
+          if-no-files-found: error
