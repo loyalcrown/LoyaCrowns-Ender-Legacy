@@ -1,0 +1,125 @@
+name: Build 0.5.0 Final Parity
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "dev/final-parity-0.5.0" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
+
+      - name: Reconstruct 0.4.0 source
+        shell: bash
+        run: |
+          ZIP="$(find . -maxdepth 1 -type f \( -name 'LoyalCrowns-Ender-Legacy-1.20.1-*-source*.zip' -o -name 'LoyaCrowns-Ender-Legacy-1.20.1-*-source*.zip' \) -print | sort -V | tail -1)"
+          test -n "$ZIP"
+          unzip -q "$ZIP"
+          PROJECT_DIR="$(find . -maxdepth 2 -type f -name gradle.properties -path '*Ender-Legacy*' -printf '%h\n' | head -1)"
+          test -n "$PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          if grep -q '^mod_version=0.1.0-alpha$' "$PROJECT_DIR/gradle.properties"; then
+            cp patches/0.1.1/FarmingStationBlockEntity.java "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/FarmingStationBlockEntity.java"
+            sed -i 's/mod_version=0.1.0-alpha/mod_version=0.1.1-alpha/' "$PROJECT_DIR/gradle.properties"
+            python patches/0.1.1/fix_output.py
+          fi
+          curl -L --fail --retry 3 --retry-delay 2 'https://www.curseforge.com/api/v1/mods/64578/files/4674244/download' -o EnderIO-1.12.2-5.3.72.jar
+          jar tf EnderIO-1.12.2-5.3.72.jar >/dev/null
+          cat patches/0.2.0/visuals.part* > /tmp/upgrade_visuals.py
+          cat patches/0.2.0/content.part* > /tmp/upgrade_content.py
+          python /tmp/upgrade_visuals.py "$PROJECT_DIR" "$GITHUB_WORKSPACE/EnderIO-1.12.2-5.3.72.jar"
+          python /tmp/upgrade_content.py "$PROJECT_DIR" "$GITHUB_WORKSPACE/EnderIO-1.12.2-5.3.72.jar"
+          cat patches/0.3.0/full_core.part* > /tmp/full_core.b64
+          python - <<'PY'
+          from pathlib import Path
+          import base64, zlib
+          Path('/tmp/full_core_port.py').write_bytes(zlib.decompress(base64.b64decode(Path('/tmp/full_core.b64').read_text().strip())))
+          Path('/tmp/deep_parity.py').write_bytes(zlib.decompress(base64.b64decode(Path('patches/0.4.0/deep_parity.py.zlib.b64').read_text().strip())))
+          PY
+          python /tmp/full_core_port.py "$PROJECT_DIR" "$GITHUB_WORKSPACE/EnderIO-1.12.2-5.3.72.jar"
+          python /tmp/deep_parity.py "$PROJECT_DIR" "$GITHUB_WORKSPACE/EnderIO-1.12.2-5.3.72.jar"
+          python patches/0.4.0/fix_simple_crafter.py "$PROJECT_DIR"
+          grep -q '^mod_version=0.4.0-alpha$' "$PROJECT_DIR/gradle.properties"
+
+      - name: Apply 0.5.0 Farming Station GUI pass
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, zlib
+          encoded = Path('patches/0.5.0/farming_gui.patch.zlib.b64').read_text().strip()
+          Path('/tmp/farming_gui.patch').write_bytes(zlib.decompress(base64.b64decode(encoded)))
+          PY
+          patch -d "$PROJECT_DIR" -p2 < /tmp/farming_gui.patch
+          python - "$PROJECT_DIR" "$GITHUB_WORKSPACE/EnderIO-1.12.2-5.3.72.jar" <<'PY'
+          from pathlib import Path
+          import sys, zipfile
+          root=Path(sys.argv[1])
+          jar=sys.argv[2]
+          source='assets/enderio/textures/gui/40/farm_station.png'
+          target=root/'src/main/resources/assets/loyacrowns_ender_legacy/textures/gui/farm_station.png'
+          target.parent.mkdir(parents=True, exist_ok=True)
+          with zipfile.ZipFile(jar) as z:
+              target.write_bytes(z.read(source))
+          print('Restored exact Ender IO 5.3.72 Farming Station GUI texture.')
+          PY
+          grep -q '^mod_version=0.5.0-alpha$' "$PROJECT_DIR/gradle.properties"
+
+      - name: Prepare Forge build
+        shell: bash
+        run: |
+          python - "$PROJECT_DIR" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1])/'build.gradle'
+          p.write_text('\n'.join(line for line in p.read_text().splitlines() if 'com.enderio:enderio:' not in line and 'com.enderio:EnderIO:' not in line)+'\n')
+          PY
+
+      - name: Validate resources
+        shell: bash
+        run: |
+          python "$PROJECT_DIR/tools/validate_assets.py"
+          python - "$PROJECT_DIR" <<'PY'
+          from pathlib import Path
+          import json, sys
+          root=Path(sys.argv[1])/'src/main/resources'
+          n=0
+          for p in root.rglob('*'):
+              if p.suffix in {'.json','.mcmeta'}:
+                  json.loads(p.read_text()); n+=1
+          print(f'Validated {n} JSON/mcmeta resources.')
+          PY
+
+      - name: Build and reobfuscate
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          gradle --no-daemon clean build --stacktrace
+
+      - name: Validate 0.5.0 JAR
+        shell: bash
+        run: |
+          JAR="$(find "$PROJECT_DIR/build/libs" -maxdepth 1 -type f -name 'LoyalCrowns-Ender-Legacy-*.jar' ! -name '*sources*' -print -quit)"
+          test -n "$JAR"
+          jar tf "$JAR" > /tmp/jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/menu/FarmingStationMenu.class' /tmp/jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/client/FarmingStationScreen.class' /tmp/jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/registry/LegacyMenus.class' /tmp/jar-contents.txt
+          grep -q 'assets/loyacrowns_ender_legacy/textures/gui/farm_station.png' /tmp/jar-contents.txt
+          unzip -p "$JAR" META-INF/mods.toml | grep -q 'version="0.5.0-alpha"'
+          echo '0.5.0 Farming Station GUI/menu pass validated.'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LoyalCrowns-Ender-Legacy-1.20.1-0.5.0-alpha
+          path: ${{ env.PROJECT_DIR }}/build/libs/*.jar
+          if-no-files-found: error
