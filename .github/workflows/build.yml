@@ -27,24 +27,56 @@ jobs:
           fi
           echo "Using $ZIP"
           unzip -q "$ZIP"
-      - name: Prepare build
+      - name: Prepare build and Ender IO runtime
         working-directory: LoyaCrowns-Ender-Legacy
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           p = Path('build.gradle')
-          lines = p.read_text().splitlines()
+          s = p.read_text()
+          lines = s.splitlines()
           lines = [line for line in lines if 'com.enderio:enderio:' not in line and 'com.enderio:EnderIO:' not in line]
-          p.write_text('\n'.join(lines) + '\n')
-          print('Removed compile/runtime Ender IO Maven dependency; mods.toml still requires Ender IO at runtime.')
+          s = '\n'.join(lines) + '\n'
+          s = s.replace("repositories {\n    maven { url = 'https://maven.rover656.dev/releases' }\n}", "repositories {\n    maven { url = 'https://maven.rover656.dev/releases' }\n    maven { url = 'https://cursemaven.com' }\n}")
+          s = s.replace('dependencies {\n    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"', 'dependencies {\n    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"\n    runtimeOnly fg.deobf("curse.maven:ender-io-64578:7004092")')
+          p.write_text(s)
+          print('Configured Ender IO 6.2.15-beta from CurseMaven for runtime testing.')
           PY
       - name: Build
         working-directory: LoyaCrowns-Ender-Legacy
         run: gradle --no-daemon clean build --stacktrace
+      - name: Smoke test with Ender IO 6.2.15-beta
+        working-directory: LoyaCrowns-Ender-Legacy
+        shell: bash
+        run: |
+          mkdir -p run
+          echo 'eula=true' > run/eula.txt
+          set +e
+          timeout 120s gradle --no-daemon runServer > server-smoke.log 2>&1
+          CODE=$?
+          set -e
+          tail -n 160 server-smoke.log || true
+          if grep -q "Done (" run/logs/latest.log 2>/dev/null; then
+            echo "Forge server reached Done state with Ender IO 6.2.15-beta and LoyaCrown's Ender Legacy loaded."
+            exit 0
+          fi
+          echo "Server did not reach Done state (timeout/exit code $CODE)."
+          if [ -f run/logs/latest.log ]; then
+            tail -n 220 run/logs/latest.log
+          fi
+          exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: LoyaCrowns-Ender-Legacy-1.20.1
           path: LoyaCrowns-Ender-Legacy/build/libs/*.jar
           if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: server-smoke-logs
+          path: |
+            LoyaCrowns-Ender-Legacy/server-smoke.log
+            LoyaCrowns-Ender-Legacy/run/logs/latest.log
+          if-no-files-found: ignore
