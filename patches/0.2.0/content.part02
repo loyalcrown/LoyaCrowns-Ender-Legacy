@@ -1,0 +1,80 @@
+r",\n            () -> BlockEntityType.Builder.of(ZombieGeneratorBlockEntity::new,\n                    LegacyBlocks.ZOMBIE_GENERATOR.get(), LegacyBlocks.FRANKEN_ZOMBIE_GENERATOR.get(), LegacyBlocks.ENDER_GENERATOR.get()).build(null));'''
+if old in s: s=s.replace(old,new)
+elif 'LegacyBlocks.FRANKEN_ZOMBIE_GENERATOR' not in s: raise SystemExit('Zombie BE insertion point not found')
+lbe.write_text(s)
+
+# Rewrite zombie generator BE to reproduce the 5.3.72 family defaults:
+# 80/120/360 FE/t, 100k/200k/500k buffers; nutrient or Dew of the Void fuel.
+z=root/'src/main/java/com/loyacrown/enderlegacy/blockentity/ZombieGeneratorBlockEntity.java'
+z.write_text(r'''package com.loyacrown.enderlegacy.blockentity;
+
+import com.loyacrown.enderlegacy.registry.LegacyBlockEntities;
+import com.loyacrown.enderlegacy.registry.LegacyBlocks;
+import com.loyacrown.enderlegacy.util.EnergyTransferUtil;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
+import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.fluids.FluidUtil;
+import net.minecraftforge.fluids.capability.IFluidHandler;
+import net.minecraftforge.fluids.capability.templates.FluidTank;
+import net.minecraftforge.registries.ForgeRegistries;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * Shared recreation of Ender IO 5.3.72's Zombie, Frank'n'Zombie and Ender generators.
+ * Base generation values and buffers match the 1.12.2 capacitor_machines.xml defaults.
+ */
+public class ZombieGeneratorBlockEntity extends LegacyPoweredBlockEntity implements LegacyTickingBlockEntity, LegacyInteractableBlockEntity {
+    private static final int TANK_CAPACITY = 2_000;
+    private static final int START_LEVEL = 1_400; // 70%, matching 5.3.72 default minimumTankLevel
+
+    private final FluidTank fuelTank = new FluidTank(TANK_CAPACITY, this::isFuel) {
+        @Override protected void onContentsChanged() { setChanged(); }
+    };
+    private LazyOptional<IFluidHandler> fluidCapability = LazyOptional.empty();
+    private int fuelCounter;
+    private boolean active;
+
+    public ZombieGeneratorBlockEntity(BlockPos pos, BlockState state) {
+        super(LegacyBlockEntities.ZOMBIE_GENERATOR.get(), pos, state, capacityFor(state), 0, 4_000);
+    }
+
+    private static int capacityFor(BlockState state) {
+        if (state.is(LegacyBlocks.ENDER_GENERATOR.get())) return 500_000;
+        if (state.is(LegacyBlocks.FRANKEN_ZOMBIE_GENERATOR.get())) return 200_000;
+        return 100_000;
+    }
+
+    private int generationPerTick() {
+        if (getBlockState().is(LegacyBlocks.ENDER_GENERATOR.get())) return 360;
+        if (getBlockState().is(LegacyBlocks.FRANKEN_ZOMBIE_GENERATOR.get())) return 120;
+        return 80;
+    }
+
+    private int ticksPerMilliBucket() {
+        // 5.3.72 defaults: Zombie family 12,000 ticks/bucket; Ender 96,000 ticks/bucket.
+        return getBlockState().is(LegacyBlocks.ENDER_GENERATOR.get()) ? 96 : 12;
+    }
+
+    private String fuelPath() {
+        return getBlockState().is(LegacyBlocks.ENDER_GENERATOR.get()) ? "dew_of_the_void" : "nutrient_distillation";
+    }
+
+    private String fuelName() {
+        return getBlockState().is(LegacyBlocks.ENDER_GENERATOR.get()) ? "Dew of the Void" : "Nutrient Distillation";
+    }
+
+    private String machineName() {
+        if (getBlockState().is(LegacyBlocks.ENDER_GENERATOR.get())) return "Ender Generator";
+        if (getBlockState().is(LegacyBlocks.FRANKEN_ZOMBIE_GENERATOR.get())) return "Frank'n'
