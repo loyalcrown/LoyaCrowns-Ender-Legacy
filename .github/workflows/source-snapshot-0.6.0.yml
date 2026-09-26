@@ -1,0 +1,58 @@
+name: Prepare 0.6.0 Source Snapshot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "dev/final-parity-0.5.0" ]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download validated 0.5.9 source snapshot
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/source-artifact
+          gh run download 36270056789 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name LoyalCrowns-Ender-Legacy-1.20.1-0.5.9-dev-source \
+            --dir /tmp/source-artifact
+          SOURCE_ZIP="$(find /tmp/source-artifact -type f -name '*0.5.9-dev-source.zip' -print -quit)"
+          test -n "$SOURCE_ZIP"
+          unzip -q "$SOURCE_ZIP"
+          PROJECT_DIR="$(find . -maxdepth 2 -type f -name gradle.properties -path '*0.5.9-worktree*' -printf '%h\n' | head -1)"
+          test -n "$PROJECT_DIR"
+          grep -q '^mod_version=0.5.9-alpha$' "$PROJECT_DIR/gradle.properties"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Apply 0.6.0 modernization payload
+        shell: bash
+        run: |
+          echo '799380e0831887f6aa5c8b1775105a7a3d4c79f912236d129111bf1053d3d4b7  patches/0.6.0/modernization_payload.tar.gz' | sha256sum -c -
+          tar -xzf patches/0.6.0/modernization_payload.tar.gz -C "$PROJECT_DIR"
+          grep -q '^mod_version=0.6.0-alpha$' "$PROJECT_DIR/gradle.properties"
+          grep -q 'MachineRedstoneMode' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/LegacyPoweredBlockEntity.java"
+          grep -q 'Side Configuration' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/client/FarmingStationScreen.java"
+          python "$PROJECT_DIR/tools/validate_assets.py"
+
+      - name: Package reconstructed source
+        shell: bash
+        run: |
+          cp -R "$PROJECT_DIR" LoyalCrowns-Ender-Legacy-0.6.0-worktree
+          rm -rf LoyalCrowns-Ender-Legacy-0.6.0-worktree/build LoyalCrowns-Ender-Legacy-0.6.0-worktree/.gradle
+          zip -qr LoyalCrowns-Ender-Legacy-1.20.1-0.6.0-dev-source.zip LoyalCrowns-Ender-Legacy-0.6.0-worktree
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: LoyalCrowns-Ender-Legacy-1.20.1-0.6.0-dev-source
+          path: LoyalCrowns-Ender-Legacy-1.20.1-0.6.0-dev-source.zip
+          if-no-files-found: error
