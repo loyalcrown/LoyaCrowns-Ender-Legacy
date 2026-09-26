@@ -27,18 +27,17 @@ jobs:
           fi
           echo "Using $ZIP"
           unzip -q "$ZIP"
-      - name: Fix Ender IO dependency coordinates
+      - name: Prepare build
         working-directory: LoyaCrowns-Ender-Legacy
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           p = Path('build.gradle')
-          s = p.read_text()
-          s = s.replace('com.enderio:enderio:${enderio_version}:api', 'com.enderio:EnderIO:${minecraft_version}-${enderio_version}:api')
-          s = s.replace('com.enderio:enderio:${enderio_version}', 'com.enderio:EnderIO:${minecraft_version}-${enderio_version}')
-          p.write_text(s)
-          print('Patched Ender IO coordinates in build.gradle')
+          lines = p.read_text().splitlines()
+          lines = [line for line in lines if 'com.enderio:enderio:' not in line and 'com.enderio:EnderIO:' not in line]
+          p.write_text('\n'.join(lines) + '\n')
+          print('Removed compile/runtime Ender IO Maven dependency; mods.toml still requires Ender IO at runtime.')
           PY
       - name: Build
         working-directory: LoyaCrowns-Ender-Legacy
