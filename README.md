@@ -1,4 +1,4 @@
-# LoyaCrown's Ender Legacy
+# LoyalCrown's Ender Legacy
 
 A Minecraft **1.20.1 / Forge 47.4.x** addon for **Ender IO 6.2.15-beta** that restores legacy Ender IO blocks removed from the modern rewrite.
 
