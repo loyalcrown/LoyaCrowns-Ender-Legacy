@@ -1,4 +1,4 @@
-name: Build LoyaCrown's Ender Legacy
+name: Build LoyalCrown's Ender Legacy
 
 on:
   workflow_dispatch:
@@ -43,6 +43,34 @@ jobs:
             python patches/0.1.1/fix_output.py
           fi
 
+      - name: Correct LoyalCrown branding
+        working-directory: LoyaCrowns-Ender-Legacy
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path('gradle.properties'): [
+                  ("mod_name=LoyaCrown's Ender Legacy", "mod_name=LoyalCrown's Ender Legacy"),
+              ],
+              Path('build.gradle'): [
+                  ('LoyaCrowns-Ender-Legacy', 'LoyalCrowns-Ender-Legacy'),
+                  ("'LoyaCrown'", "'LoyalCrown'"),
+              ],
+              Path('src/main/resources/META-INF/mods.toml'): [
+                  ('authors="LoyaCrown"', 'authors="LoyalCrown"'),
+              ],
+          }
+
+          for path, pairs in replacements.items():
+              text = path.read_text()
+              for old, new in pairs:
+                  text = text.replace(old, new)
+              path.write_text(text)
+          print("Corrected display name, author, vendor, and JAR branding to LoyalCrown.")
+          PY
+
       - name: Prepare source snapshot
         working-directory: LoyaCrowns-Ender-Legacy
         shell: bash
@@ -79,7 +107,7 @@ jobs:
         working-directory: LoyaCrowns-Ender-Legacy
         shell: bash
         run: |
-          JAR="$(find build/libs -maxdepth 1 -type f -name 'LoyaCrowns-Ender-Legacy-*.jar' ! -name '*sources*' -print -quit)"
+          JAR="$(find build/libs -maxdepth 1 -type f -name 'LoyalCrowns-Ender-Legacy-*.jar' ! -name '*sources*' -print -quit)"
           test -n "$JAR"
           echo "Validating $JAR"
           jar tf "$JAR" > jar-contents.txt
@@ -91,13 +119,15 @@ jobs:
           done
           unzip -p "$JAR" META-INF/mods.toml | grep -q 'modId="enderio"'
           unzip -p "$JAR" META-INF/mods.toml | grep -q 'versionRange="\[6.2.15-beta,6.3)"'
+          unzip -p "$JAR" META-INF/mods.toml | grep -q "displayName=\"LoyalCrown's Ender Legacy\""
+          unzip -p "$JAR" META-INF/mods.toml | grep -q 'authors="LoyalCrown"'
           if [ -f ../patches/0.1.1/FarmingStationBlockEntity.java ]; then
             unzip -p "$JAR" META-INF/mods.toml | grep -q 'version="0.1.1-alpha"'
           fi
-          echo 'Release JAR structure and Ender IO dependency metadata validated.'
+          echo 'Release JAR structure, LoyalCrown branding, and Ender IO dependency metadata validated.'
 
       - uses: actions/upload-artifact@v4
         with:
-          name: LoyaCrowns-Ender-Legacy-1.20.1
+          name: LoyalCrowns-Ender-Legacy-1.20.1
           path: LoyaCrowns-Ender-Legacy/build/libs/*.jar
           if-no-files-found: error
