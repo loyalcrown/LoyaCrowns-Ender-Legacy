@@ -1,0 +1,60 @@
+name: Prepare 0.5.5 Source Snapshot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "dev/final-parity-0.5.0" ]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download validated 0.5.4 source snapshot
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/source-artifact
+          gh run download 36259791522 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name LoyalCrowns-Ender-Legacy-1.20.1-0.5.4-dev-source \
+            --dir /tmp/source-artifact
+          SOURCE_ZIP="$(find /tmp/source-artifact -type f -name '*0.5.4-dev-source.zip' -print -quit)"
+          test -n "$SOURCE_ZIP"
+          unzip -q "$SOURCE_ZIP"
+          PROJECT_DIR="$(find . -maxdepth 2 -type f -name gradle.properties -path '*0.5.4-worktree*' -printf '%h\n' | head -1)"
+          test -n "$PROJECT_DIR"
+          grep -q '^mod_version=0.5.4-alpha$' "$PROJECT_DIR/gradle.properties"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Apply 0.5.5 stored recipe memory pass
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, zlib
+          encoded = Path('patches/0.5.5/inventory_recipe_memory.patch.zlib.b64').read_text().strip()
+          Path('/tmp/inventory_recipe_memory.patch').write_bytes(zlib.decompress(base64.b64decode(encoded)))
+          PY
+          patch -d "$PROJECT_DIR" -p1 < /tmp/inventory_recipe_memory.patch
+          grep -q '^mod_version=0.5.5-alpha$' "$PROJECT_DIR/gradle.properties"
+
+      - name: Package reconstructed source
+        shell: bash
+        run: |
+          cp -R "$PROJECT_DIR" LoyalCrowns-Ender-Legacy-0.5.5-worktree
+          rm -rf LoyalCrowns-Ender-Legacy-0.5.5-worktree/build LoyalCrowns-Ender-Legacy-0.5.5-worktree/.gradle
+          zip -qr LoyalCrowns-Ender-Legacy-1.20.1-0.5.5-dev-source.zip LoyalCrowns-Ender-Legacy-0.5.5-worktree
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: LoyalCrowns-Ender-Legacy-1.20.1-0.5.5-dev-source
+          path: LoyalCrowns-Ender-Legacy-1.20.1-0.5.5-dev-source.zip
+          if-no-files-found: error
