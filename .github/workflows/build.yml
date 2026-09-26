@@ -3,7 +3,7 @@ name: Build LoyalCrown's Ender Legacy
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "dev/farming-station-0.1.1" ]
+    branches: [ "main", "dev/1.12.2-reference-0.2.0" ]
   pull_request:
     branches: [ "main" ]
 
@@ -20,7 +20,7 @@ jobs:
         with:
           gradle-version: '8.8'
 
-      - name: Extract source snapshot
+      - name: Extract base source snapshot
         shell: bash
         run: |
           ZIP="$(find . -maxdepth 1 -type f -name 'LoyalCrowns-Ender-Legacy-1.20.1-*-source*.zip' -print | sort -V | tail -1)"
@@ -31,47 +31,46 @@ jobs:
           echo "Using $ZIP"
           unzip -q "$ZIP"
 
-      - name: Apply development patches
+      - name: Apply Farming Station 0.1.1 baseline
         shell: bash
         run: |
           if [ -f patches/0.1.1/FarmingStationBlockEntity.java ]; then
             cp patches/0.1.1/FarmingStationBlockEntity.java LoyaCrowns-Ender-Legacy/src/main/java/com/loyacrown/enderlegacy/blockentity/FarmingStationBlockEntity.java
             sed -i 's/mod_version=0.1.0-alpha/mod_version=0.1.1-alpha/' LoyaCrowns-Ender-Legacy/gradle.properties
-            echo 'Applied Farming Station 0.1.1 patch.'
           fi
           if [ -f patches/0.1.1/fix_output.py ]; then
             python patches/0.1.1/fix_output.py
           fi
 
-      - name: Correct LoyalCrown branding
+      - name: Download exact legacy reference JARs
+        shell: bash
+        run: |
+          set -e
+          curl -fL --retry 3 'https://www.cursemaven.com/curse/maven/ender-io-64578/4674244/ender-io-64578-4674244.jar' -o /tmp/EnderIO-1.12.2-5.3.72.jar || \
+            curl -fL --retry 3 'https://media.forgecdn.net/files/4674/244/EnderIO-1.12.2-5.3.72.jar' -o /tmp/EnderIO-1.12.2-5.3.72.jar
+          curl -fL --retry 3 'https://www.cursemaven.com/curse/maven/ender-io-64578/2238375/ender-io-64578-2238375.jar' -o /tmp/EnderIO-1.7.10-2.2.8.381.jar || \
+            curl -fL --retry 3 'https://media.forgecdn.net/files/2238/375/EnderIO-1.7.10-2.2.8.381.jar' -o /tmp/EnderIO-1.7.10-2.2.8.381.jar
+          unzip -t /tmp/EnderIO-1.12.2-5.3.72.jar >/dev/null
+          unzip -t /tmp/EnderIO-1.7.10-2.2.8.381.jar >/dev/null
+
+      - name: Apply Ender IO 5.3.72 reference upgrade
+        shell: bash
+        run: |
+          cat patches/0.2.0/upgrade_part1.py patches/0.2.0/upgrade_part2.py > /tmp/upgrade_from_1_12_2.py
+          python /tmp/upgrade_from_1_12_2.py LoyaCrowns-Ender-Legacy /tmp/EnderIO-1.12.2-5.3.72.jar /tmp/EnderIO-1.7.10-2.2.8.381.jar
+
+      - name: Verify target compatibility
         working-directory: LoyaCrowns-Ender-Legacy
         shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
+          grep -q '^minecraft_version=1.20.1$' gradle.properties
+          grep -q '^forge_version=47.4.0$' gradle.properties
+          grep -q '^mod_version=0.2.0-alpha$' gradle.properties
+          grep -q "^mod_name=LoyalCrown's Ender Legacy$" gradle.properties
+          grep -q 'versionRange="\[6.2.15-beta,6.3)"' src/main/resources/META-INF/mods.toml
+          echo 'Target locked to Minecraft 1.20.1 / Forge 47.4.0 / Ender IO 6.2.15-beta.'
 
-          replacements = {
-              Path('gradle.properties'): [
-                  ("mod_name=LoyaCrown's Ender Legacy", "mod_name=LoyalCrown's Ender Legacy"),
-              ],
-              Path('build.gradle'): [
-                  ('LoyaCrowns-Ender-Legacy', 'LoyalCrowns-Ender-Legacy'),
-                  ("'LoyaCrown'", "'LoyalCrown'"),
-              ],
-              Path('src/main/resources/META-INF/mods.toml'): [
-                  ('authors="LoyaCrown"', 'authors="LoyalCrown"),
-              ],
-          }
-
-          for path, pairs in replacements.items():
-              text = path.read_text()
-              for old, new in pairs:
-                  text = text.replace(old, new)
-              path.write_text(text)
-          print("Corrected display name, author, vendor, and JAR branding to LoyalCrown.")
-          PY
-
-      - name: Prepare source snapshot
+      - name: Prepare source for Forge build
         working-directory: LoyaCrowns-Ender-Legacy
         shell: bash
         run: |
@@ -81,7 +80,7 @@ jobs:
           lines = p.read_text().splitlines()
           lines = [line for line in lines if 'com.enderio:enderio:' not in line and 'com.enderio:EnderIO:' not in line]
           p.write_text('\n'.join(lines) + '\n')
-          print('Ender IO is enforced by mods.toml at runtime; the addon compiles against Forge APIs only.')
+          print('Ender IO remains a mandatory runtime dependency in mods.toml.')
           PY
 
       - name: Validate resource JSON
@@ -99,6 +98,10 @@ jobs:
           print(f'Validated {checked} JSON/mcmeta resource files.')
           PY
 
+      - name: Validate models and textures
+        working-directory: LoyaCrowns-Ender-Legacy
+        run: python tools/validate_assets.py
+
       - name: Build and reobfuscate
         working-directory: LoyaCrowns-Ender-Legacy
         run: gradle --no-daemon clean build --stacktrace
@@ -113,21 +116,20 @@ jobs:
           jar tf "$JAR" > jar-contents.txt
           grep -q 'META-INF/mods.toml' jar-contents.txt
           grep -q 'com/loyacrown/enderlegacy/LoyaCrownsEnderLegacy.class' jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/block/LegacyExitRailBlock.class' jar-contents.txt
           grep -q 'com/loyacrown/enderlegacy/blockentity/FarmingStationBlockEntity.class' jar-contents.txt
-          for block in farming_station reservoir combustion_generator zombie_generator photovoltaic_cell advanced_photovoltaic_cell hyper_cube dimensional_transceiver power_monitor the_vat wireless_charger killer_joe attractor_obelisk item_buffer power_buffer omni_buffer creative_buffer dark_steel_anvil painted_carpet ender_rail ender_io; do
+          for block in farming_station reservoir combustion_generator zombie_generator photovoltaic_cell advanced_photovoltaic_cell hyper_cube dimensional_transceiver power_monitor advanced_power_monitor the_vat wireless_charger killer_joe attractor_obelisk item_buffer power_buffer omni_buffer creative_buffer dark_steel_anvil painted_carpet ender_rail exit_rail ender_io; do
             grep -q "assets/loyacrowns_ender_legacy/models/block/${block}.json" jar-contents.txt
           done
           unzip -p "$JAR" META-INF/mods.toml | grep -q 'modId="enderio"'
           unzip -p "$JAR" META-INF/mods.toml | grep -q 'versionRange="\[6.2.15-beta,6.3)"'
+          unzip -p "$JAR" META-INF/mods.toml | grep -q 'version="0.2.0-alpha"'
           unzip -p "$JAR" META-INF/mods.toml | grep -q "displayName=\"LoyalCrown's Ender Legacy\""
           unzip -p "$JAR" META-INF/mods.toml | grep -q 'authors="LoyalCrown"'
-          if [ -f ../patches/0.1.1/FarmingStationBlockEntity.java ]; then
-            unzip -p "$JAR" META-INF/mods.toml | grep -q 'version="0.1.1-alpha"'
-          fi
-          echo 'Release JAR structure, LoyalCrown branding, and Ender IO dependency metadata validated.'
+          echo 'Release JAR structure, assets, branding, and Ender IO dependency metadata validated.'
 
       - uses: actions/upload-artifact@v4
         with:
-          name: LoyalCrowns-Ender-Legacy-1.20.1
+          name: LoyalCrowns-Ender-Legacy-1.20.1-0.2.0-alpha
           path: LoyaCrowns-Ender-Legacy/build/libs/*.jar
           if-no-files-found: error
