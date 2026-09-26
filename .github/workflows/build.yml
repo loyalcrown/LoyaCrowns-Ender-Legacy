@@ -3,7 +3,7 @@ name: Build LoyalCrown's Ender Legacy
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "dev/1.12-parity", "dev/full-core-parity-0.3.0" ]
+    branches: [ "main", "dev/1.12-parity", "dev/full-core-parity-0.3.0", "dev/deep-parity-0.4.0" ]
   pull_request:
     branches: [ "main" ]
 
@@ -80,6 +80,18 @@ jobs:
           python /tmp/full_core_port.py "$PROJECT_DIR" "$GITHUB_WORKSPACE/EnderIO-1.12.2-5.3.72.jar"
           grep -q '^mod_version=0.3.0-alpha$' "$PROJECT_DIR/gradle.properties"
 
+      - name: Apply 0.4.0 deep functional parity pass
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, zlib
+          encoded = Path('patches/0.4.0/deep_parity.py.zlib.b64').read_text().strip()
+          Path('/tmp/deep_parity.py').write_bytes(zlib.decompress(base64.b64decode(encoded)))
+          PY
+          python /tmp/deep_parity.py "$PROJECT_DIR" "$GITHUB_WORKSPACE/EnderIO-1.12.2-5.3.72.jar"
+          grep -q '^mod_version=0.4.0-alpha$' "$PROJECT_DIR/gradle.properties"
+
       - name: Prepare Forge build
         shell: bash
         run: |
@@ -118,7 +130,7 @@ jobs:
           cd "$PROJECT_DIR"
           gradle --no-daemon clean build --stacktrace
 
-      - name: Validate 0.3.0 release JAR
+      - name: Validate 0.4.0 release JAR
         shell: bash
         run: |
           JAR="$(find "$PROJECT_DIR/build/libs" -maxdepth 1 -type f -name 'LoyalCrowns-Ender-Legacy-*.jar' ! -name '*sources*' -print -quit)"
@@ -127,28 +139,29 @@ jobs:
           jar tf "$JAR" > jar-contents.txt
           grep -q 'META-INF/mods.toml' jar-contents.txt
           grep -q 'com/loyacrown/enderlegacy/LoyaCrownsEnderLegacy.class' jar-contents.txt
-          grep -q 'com/loyacrown/enderlegacy/registry/LegacyItems.class' jar-contents.txt
-          grep -q 'com/loyacrown/enderlegacy/blockentity/LegacyStorageBlockEntity.class' jar-contents.txt
-          grep -q 'com/loyacrown/enderlegacy/blockentity/TelepadBlockEntity.class' jar-contents.txt
-          grep -q 'com/loyacrown/enderlegacy/blockentity/LavaHeatExchangerBlockEntity.class' jar-contents.txt
-          grep -q 'com/loyacrown/enderlegacy/item/InventoryChargerItem.class' jar-contents.txt
-          for block in farming_station dark_steel_anvil ender_rail exit_rail inventory_panel tele_pad lava_generator inhibitor_obelisk enhanced_alloy_smelter creative_spawner omni_reservoir; do
+          grep -q 'com/loyacrown/enderlegacy/item/InventoryRemoteItem.class' jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/util/NetworkInventoryContainer.class' jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/blockentity/SimpleAlloySmelterBlockEntity.class' jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/blockentity/SimpleSagMillBlockEntity.class' jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/blockentity/SimpleStirlingGeneratorBlockEntity.class' jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/blockentity/SimpleCrafterBlockEntity.class' jar-contents.txt
+          for block in farming_station inventory_panel simple_alloy_smelter simple_sag_mill simple_stirling_generator simple_crafter simple_wired_charger dark_steel_anvil ender_rail exit_rail tele_pad lava_generator; do
             grep -q "assets/loyacrowns_ender_legacy/models/block/${block}.json" jar-contents.txt
             grep -q "assets/loyacrowns_ender_legacy/blockstates/${block}.json" jar-contents.txt
             grep -q "assets/loyacrowns_ender_legacy/models/item/${block}.json" jar-contents.txt
           done
-          for item in dark_steel_pickaxe end_steel_sword rod_of_return inventory_charger_vibrant big_advanced_item_filter electrical_steel_ingot; do
+          for item in inventory_remote_basic inventory_remote_advanced inventory_remote_ender dark_steel_pickaxe rod_of_return electrical_steel_ingot; do
             grep -q "assets/loyacrowns_ender_legacy/models/item/${item}.json" jar-contents.txt
           done
           unzip -p "$JAR" META-INF/mods.toml | grep -q 'modId="enderio"'
           unzip -p "$JAR" META-INF/mods.toml | grep -q 'versionRange="\[6.2.15-beta,6.3)"'
-          unzip -p "$JAR" META-INF/mods.toml | grep -q 'version="0.3.0-alpha"'
+          unzip -p "$JAR" META-INF/mods.toml | grep -q 'version="0.4.0-alpha"'
           unzip -p "$JAR" META-INF/mods.toml | grep -q "displayName=\"LoyalCrown's Ender Legacy\""
           unzip -p "$JAR" META-INF/mods.toml | grep -q 'authors="LoyalCrown"'
-          echo '0.3.0-alpha JAR structure, restored blocks/items, assets, branding, and dependency metadata validated.'
+          echo '0.4.0-alpha JAR structure, deep-parity classes/resources, branding, and dependency metadata validated.'
 
       - uses: actions/upload-artifact@v4
         with:
-          name: LoyalCrowns-Ender-Legacy-1.20.1-0.3.0-alpha
+          name: LoyalCrowns-Ender-Legacy-1.20.1-0.4.0-alpha
           path: ${{ env.PROJECT_DIR }}/build/libs/*.jar
           if-no-files-found: error
