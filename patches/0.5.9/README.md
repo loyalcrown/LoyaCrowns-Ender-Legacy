@@ -13,4 +13,8 @@ It restores the classic Inventory Panel JEI search synchronization control while
 - treats JEI-sourced search text as temporary, so it filters the live network without overwriting the panel's remembered text;
 - uses JEI's compile-only API and a small runtime bridge, so JEI is not required to load Ender Legacy.
 
+Runtime hotfix included after in-game crash validation:
+
+- removes redundant `.stacksTo(1)` calls from the damageable Dark Steel Crook and Dark Steel Treetap registrations. Minecraft 1.20.1 rejects an explicit stack-size setter after durability has been assigned.
+
 The reconstructed source version is `0.5.9-alpha`.

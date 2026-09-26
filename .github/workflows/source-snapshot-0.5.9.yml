@@ -46,7 +46,7 @@ jobs:
           import base64, hashlib, zlib
           encoded = Path('/tmp/inventory_jei_sync.b64').read_text().replace('\n','').strip()
           decoded = zlib.decompress(base64.b64decode(encoded, validate=True))
-          assert hashlib.sha256(decoded).hexdigest() == 'fa519fda17ecf81644d9cc028ac205177dc0a1d388df53cadc33aa939b754a06'
+          assert hashlib.sha256(decoded).hexdigest() == '2e3e0f10df339f3e80f676b45cf71b0b1b39feeca4f24af042502594d83bce0a'
           Path('/tmp/inventory_jei_sync.patch').write_bytes(decoded)
           PY
           patch -d "$PROJECT_DIR" -p1 < /tmp/inventory_jei_sync.patch
@@ -56,6 +56,12 @@ jobs:
           grep -q '@JeiPlugin' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/client/compat/jei/EnderLegacyJeiPlugin.java"
           grep -q 'jei-1.20.1-common-api:15.20.0.118' "$PROJECT_DIR/build.gradle"
           grep -q 'jei-1.20.1-forge-api:15.20.0.118' "$PROJECT_DIR/build.gradle"
+          python - "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/registry/LegacyItems.java" <<'PY'
+          from pathlib import Path
+          import sys
+          text = Path(sys.argv[1]).read_text()
+          assert '.durability(2031).stacksTo(1)' not in text, 'damageable item still sets stack size after durability'
+          PY
 
       - name: Package reconstructed source
         shell: bash
