@@ -9,7 +9,7 @@ This project was created from a comparison between:
 
 The addon deliberately does **not** duplicate legacy blocks that already have a modern Ender IO equivalent.
 
-## Restored blocks in the first alpha
+## Restored blocks
 
 - Farming Station
 - Reservoir
@@ -33,30 +33,26 @@ The addon deliberately does **not** duplicate legacy blocks that already have a 
 - Ender Rail
 - Ender IO remote-access block
 
-See `PORT_STATUS.md` for the feature-by-feature status and the legacy blocks intentionally omitted because Ender IO 6.2.15 already contains their modern equivalents.
+## Farming Station 0.1.1
+
+The Farming Station now more closely follows the 1.7.10 machine: dedicated hoe/axe/supply/output/capacitor slots, legacy-style capacitor range upgrades, automatic tilling, vanilla crop farming, sapling planting/tree chopping, and melon/pumpkin/sugar-cane/cactus harvesting. See `patches/0.1.1/CHANGELOG.md` for details.
 
 ## Target
 
 - Minecraft: **1.20.1**
-- Forge: **47.4.0+** (source target is 47.4.0)
+- Forge: **47.4.x**
 - Ender IO: **6.2.15-beta**
 - Java: **17**
 
-## Important alpha note
+## Build status
 
-This is an early functional port. The source/resources have been statically checked, but this snapshot has **not yet been compiled or launched inside a Forge runtime in this workspace** because the Forge development dependencies are not available offline here. Use the included GitHub Actions workflow or a Forge development environment to produce and test the JAR. Do not treat the alpha as world-safe until it has passed a test-world cycle.
+GitHub Actions compiles, reobfuscates, validates resources, checks the packaged mod metadata, and uploads a testable Forge JAR. Ender IO is a mandatory runtime dependency declared in `mods.toml`; this addon intentionally uses Forge capabilities and registry IDs instead of Ender IO internal classes.
 
-## Building
+The previous attempt to launch the production Ender IO JAR inside ForgeGradle's mapped `runServer` environment was removed because Ender IO's release mixins reference production/obfuscated names and therefore fail in that userdev environment. That failure was from the development test environment, not from LoyaCrown's Ender Legacy compilation.
 
-With Java 17 and Gradle 8.8 installed:
+## Testing note
 
-```text
-gradle clean build
-```
-
-The output JAR will be in `build/libs/`.
-
-If using GitHub, the included `.github/workflows/build.yml` builds the JAR automatically and uploads it as an Actions artifact.
+This is still alpha software. Back up any important world before testing. The next validation step is a normal Minecraft Forge 1.20.1 client using Ender IO 6.2.15-beta and the generated LoyaCrown's Ender Legacy JAR.
 
 ## License / attribution
 
