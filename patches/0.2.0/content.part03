@@ -1,0 +1,96 @@
+Zombie Generator";
+        return "Zombie Generator";
+    }
+
+    private boolean isFuel(FluidStack stack) {
+        ResourceLocation id = ForgeRegistries.FLUIDS.getKey(stack.getFluid());
+        return id != null && id.getNamespace().equals("enderio") && id.getPath().equals(fuelPath());
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        fluidCapability = LazyOptional.of(() -> fuelTank);
+    }
+
+    @Override
+    public void invalidateCaps() {
+        super.invalidateCaps();
+        fluidCapability.invalidate();
+    }
+
+    @Override
+    public <T> @NotNull LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
+        if (cap == ForgeCapabilities.FLUID_HANDLER) return fluidCapability.cast();
+        return super.getCapability(cap, side);
+    }
+
+    @Override
+    public void serverTick() {
+        if (level == null || level.isClientSide) return;
+
+        if (active && fuelTank.isEmpty()) active = false;
+        if (!active && fuelTank.getFluidAmount() >= START_LEVEL) active = true;
+
+        int generation = generationPerTick();
+        if (active && !fuelTank.isEmpty() && energy.getEnergyStored() <= energy.getMaxEnergyStored() - generation) {
+            energy.addEnergyInternal(generation, false);
+            if (++fuelCounter >= ticksPerMilliBucket()) {
+                fuelCounter = 0;
+                fuelTank.drain(1, IFluidHandler.FluidAction.EXECUTE);
+            }
+            setChanged();
+        }
+        EnergyTransferUtil.pushEnergy(level, worldPosition, energy, 1_000);
+    }
+
+    @Override
+    public InteractionResult onUse(Player player, InteractionHand hand) {
+        if (player.level().isClientSide) return InteractionResult.SUCCESS;
+        if (FluidUtil.interactWithFluidHandler(player, hand, fuelTank)) return InteractionResult.CONSUME;
+        player.displayClientMessage(Component.literal(machineName() + " — " + energy.getEnergyStored() + "/" + energy.getMaxEnergyStored()
+                + " FE | " + fuelName() + " " + fuelTank.getFluidAmount() + "/" + fuelTank.getCapacity() + " mB | "
+                + generationPerTick() + " FE/t"), true);
+        return InteractionResult.CONSUME;
+    }
+
+    @Override
+    protected void saveAdditional(CompoundTag tag) {
+        super.saveAdditional(tag);
+        tag.put("Fuel", fuelTank.writeToNBT(new CompoundTag()));
+        tag.putInt("FuelCounter", fuelCounter);
+        tag.putBoolean("Active", active);
+    }
+
+    @Override
+    public void load(CompoundTag tag) {
+        super.load(tag);
+        // Preserve 0.1.x worlds that used the old Nutrient key.
+        if (tag.contains("Fuel")) fuelTank.readFromNBT(tag.getCompound("Fuel"));
+        else if (tag.contains("Nutrient")) fuelTank.readFromNBT(tag.getCompound("Nutrient"));
+        fuelCounter = tag.getInt("FuelCounter");
+        active = tag.getBoolean("Active");
+    }
+}
+''')
+
+# New translations.
+lang=assets/'lang/en_us.json'; d=json.loads(lang.read_text())
+d.update({
+ 'block.loyacrowns_ender_legacy.franken_zombie_generator':"Frank'n'Zombie Generator",
+ 'block.loyacrowns_ender_legacy.ender_generator':'Ender Generator',
+ 'block.loyacrowns_ender_legacy.dark_paper_anvil':'Dark Paper Anvil',
+})
+lang.write_text(json.dumps(dict(sorted(d.items())),indent=2)+'\n')
+
+# Self-drop loot for new blocks.
+def self_loot(name):
+    return {'type':'minecraft:block','pools':[{'bonus_rolls':0.0,'conditions':[{'condition':'minecraft:survives_explosion'}],'entries':[{'type':'minecraft:item','name':f'loyacrowns_ender_legacy:{name}'}],'rolls':1.0}]}
+for name in ['franken_zombie_generator','ender_generator','dark_paper_anvil']:
+    writej(loot/(name+'.json'),self_loot(name))
+
+# Recipes use modern Ender IO items when they still exist; these are intentionally simple
+# compatibility recipes rather than claiming byte-for-byte old recipe parity.
+writej(recipes/'dark_paper_anvil.json',{
+ 'type':'minecraft:crafting_shaped','category':'misc','pattern':['PPP',' P ','PPP'],
+ 'key':{'P':{'item':'enderi
