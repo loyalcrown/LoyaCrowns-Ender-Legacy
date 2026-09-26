@@ -43,11 +43,18 @@ jobs:
       - name: Apply 0.5.7 Inventory Panel power and nutrient pass
         shell: bash
         run: |
+          cat patches/0.5.7/inventory_power_nutrient.b64.part1 \
+              patches/0.5.7/inventory_power_nutrient.b64.part2 \
+              patches/0.5.7/inventory_power_nutrient.b64.part3 \
+              patches/0.5.7/inventory_power_nutrient.b64.part4 \
+              > /tmp/inventory_power_nutrient.b64
           python - <<'PY'
           from pathlib import Path
           import base64, zlib
-          encoded = Path('patches/0.5.7/inventory_power_nutrient.patch.zlib.b64').read_text().strip()
-          Path('/tmp/inventory_power_nutrient.patch').write_bytes(zlib.decompress(base64.b64decode(encoded)))
+          encoded = Path('/tmp/inventory_power_nutrient.b64').read_text().strip()
+          assert len(encoded) == 8512, f'Unexpected patch length: {len(encoded)}'
+          decoded = base64.b64decode(encoded, validate=True)
+          Path('/tmp/inventory_power_nutrient.patch').write_bytes(zlib.decompress(decoded))
           PY
           patch -d "$PROJECT_DIR" -p1 < /tmp/inventory_power_nutrient.patch
           grep -q '^mod_version=0.5.7-alpha$' "$PROJECT_DIR/gradle.properties"
