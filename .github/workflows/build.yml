@@ -27,6 +27,19 @@ jobs:
           fi
           echo "Using $ZIP"
           unzip -q "$ZIP"
+      - name: Fix Ender IO dependency coordinates
+        working-directory: LoyaCrowns-Ender-Legacy
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('build.gradle')
+          s = p.read_text()
+          s = s.replace('com.enderio:enderio:${enderio_version}:api', 'com.enderio:EnderIO:${minecraft_version}-${enderio_version}:api')
+          s = s.replace('com.enderio:enderio:${enderio_version}', 'com.enderio:EnderIO:${minecraft_version}-${enderio_version}')
+          p.write_text(s)
+          print('Patched Ender IO coordinates in build.gradle')
+          PY
       - name: Build
         working-directory: LoyaCrowns-Ender-Legacy
         run: gradle --no-daemon clean build --stacktrace
