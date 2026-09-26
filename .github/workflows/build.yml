@@ -137,7 +137,7 @@ jobs:
             grep -q "assets/loyacrowns_ender_legacy/blockstates/${block}.json" jar-contents.txt
             grep -q "assets/loyacrowns_ender_legacy/models/item/${block}.json" jar-contents.txt
           done
-          for item in dark_steel_pickaxe end_steel_sword rod_of_return inventory_charger_vibrant item_filter_big_advanced electrical_steel_ingot; do
+          for item in dark_steel_pickaxe end_steel_sword rod_of_return inventory_charger_vibrant big_advanced_item_filter electrical_steel_ingot; do
             grep -q "assets/loyacrowns_ender_legacy/models/item/${item}.json" jar-contents.txt
           done
           unzip -p "$JAR" META-INF/mods.toml | grep -q 'modId="enderio"'
