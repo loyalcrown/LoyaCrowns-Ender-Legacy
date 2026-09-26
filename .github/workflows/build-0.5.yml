@@ -60,6 +60,7 @@ jobs:
           Path('/tmp/farming_gui.patch').write_bytes(zlib.decompress(base64.b64decode(encoded)))
           PY
           patch -d "$PROJECT_DIR" -p2 < /tmp/farming_gui.patch
+          python patches/0.5.0/fix_client_menu_registration.py "$PROJECT_DIR"
           python - "$PROJECT_DIR" "$GITHUB_WORKSPACE/EnderIO-1.12.2-5.3.72.jar" <<'PY'
           from pathlib import Path
           import sys, zipfile
