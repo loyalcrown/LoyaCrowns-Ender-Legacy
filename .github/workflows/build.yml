@@ -1,0 +1,30 @@
+name: Build LoyaCrown's Ender Legacy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
+      - name: Extract source snapshot
+        run: unzip -q LoyaCrowns-Ender-Legacy-1.20.1-0.1.0-alpha-source.zip
+      - name: Build
+        working-directory: LoyaCrowns-Ender-Legacy
+        run: gradle --no-daemon clean build --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: LoyaCrowns-Ender-Legacy-1.20.1
+          path: LoyaCrowns-Ender-Legacy/build/libs/*.jar
+          if-no-files-found: warn
