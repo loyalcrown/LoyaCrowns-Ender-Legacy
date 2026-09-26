@@ -1,0 +1,31 @@
+''package com.loyacrown.enderlegacy.block;\n\nimport net.minecraft.core.BlockPos;\nimport net.minecraft.world.entity.Entity;\nimport net.minecraft.world.entity.vehicle.AbstractMinecart;\nimport net.minecraft.world.entity.vehicle.MinecartFurnace;\nimport net.minecraft.world.level.Level;\nimport net.minecraft.world.level.block.PoweredRailBlock;\nimport net.minecraft.world.level.block.state.BlockBehaviour;\nimport net.minecraft.world.level.block.state.BlockState;\n\n/**\n * 1.20.1 recreation of Ender IO 5.3.72's Exit Rail. The old rail had a very\n * low max speed, ejected riders, and destroyed ordinary rideable minecarts.\n * Furnace minecarts were explicitly exempt in the 1.12 implementation.\n */\npublic class LegacyExitRailBlock extends PoweredRailBlock {\n    public LegacyExitRailBlock(BlockBehaviour.Properties properties) {\n        super(properties);\n    }\n\n    @Override\n    public void entityInside(BlockState state, Level level, BlockPos pos, Entity entity) {\n        super.entityInside(state, level, pos, entity);\n        if (level.isClientSide || !(entity instanceof AbstractMinecart cart) || cart instanceof MinecartFurnace) {\n            return;\n        }\n        cart.ejectPassengers();\n        cart.discard();\n    }\n}\n''')
+
+# Registry additions.
+lb=root/'src/main/java/com/loyacrown/enderlegacy/registry/LegacyBlocks.java'
+s=lb.read_text()
+s=s.replace('import com.loyacrown.enderlegacy.block.LegacyEnderRailBlock;','import com.loyacrown.enderlegacy.block.LegacyEnderRailBlock;\nimport com.loyacrown.enderlegacy.block.LegacyExitRailBlock;')
+s=s.replace('    public static final RegistryObject<Block> POWER_MONITOR = registerBlock("power_monitor",\n            () -> new LegacyPowerMonitorBlock(machineProps(), () -> LegacyBlockEntities.POWER_MONITOR.get()));',
+'''    public static final RegistryObject<Block> POWER_MONITOR = registerBlock("power_monitor",\n            () -> new LegacyPowerMonitorBlock(machineProps(), () -> LegacyBlockEntities.POWER_MONITOR.get()));\n    public static final RegistryObject<Block> ADVANCED_POWER_MONITOR = registerBlock("advanced_power_monitor",\n            () -> new LegacyPowerMonitorBlock(machineProps(), () -> LegacyBlockEntities.POWER_MONITOR.get()));''')
+s=s.replace('    public static final RegistryObject<Block> ENDER_RAIL = registerBlock("ender_rail",\n            () -> new LegacyEnderRailBlock(BlockBehaviour.Properties.copy(Blocks.POWERED_RAIL).noCollission().strength(0.7F)));',
+'''    public static final RegistryObject<Block> ENDER_RAIL = registerBlock("ender_rail",\n            () -> new LegacyEnderRailBlock(BlockBehaviour.Properties.copy(Blocks.POWERED_RAIL).noCollission().strength(0.7F)));\n    public static final RegistryObject<Block> EXIT_RAIL = registerBlock("exit_rail",\n            () -> new LegacyExitRailBlock(BlockBehaviour.Properties.copy(Blocks.POWERED_RAIL).noCollission().strength(0.7F)));''')
+lb.write_text(s)
+
+lbe=root/'src/main/java/com/loyacrown/enderlegacy/registry/LegacyBlockEntities.java'
+s=lbe.read_text().replace('LegacyBlocks.POWER_MONITOR.get()).build(null));','LegacyBlocks.POWER_MONITOR.get(), LegacyBlocks.ADVANCED_POWER_MONITOR.get()).build(null));')
+lbe.write_text(s)
+
+# Lang.
+lang=assets/'lang/en_us.json'
+d=json.loads(lang.read_text())
+d['block.loyacrowns_ender_legacy.advanced_power_monitor']='Graphical Power Monitor'
+d['block.loyacrowns_ender_legacy.exit_rail']='Exit Rail'
+lang.write_text(json.dumps(dict(sorted(d.items())),indent=2)+"\n")
+
+# Loot & recipes for new blocks.
+def self_loot(name):
+    return {'type':'minecraft:block','pools':[{'bonus_rolls':0.0,'conditions':[{'condition':'minecraft:survives_explosion'}],'entries':[{'type':'minecraft:item','name':f'loyacrowns_ender_legacy:{name}'}],'rolls':1.0}]}
+for name in ['advanced_power_monitor','exit_rail']:
+    writej(loot/(name+'.json'),self_loot(name))
+writej(recipes/'exit_rail.json',{
+ 'type':'minecraft:crafting_shaped','category':'transportation','pattern':['IPI','ISI','IRI'],
+ 'key':{'I':{'tag':'forge:
