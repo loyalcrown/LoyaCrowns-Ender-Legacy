@@ -75,6 +75,18 @@ jobs:
           PY
           grep -q '^mod_version=0.5.0-alpha$' "$PROJECT_DIR/gradle.properties"
 
+      - name: Apply 0.5.1 Farming Station behavior pass
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, zlib
+          encoded = Path('patches/0.5.1/farming_deep_parity.patch.zlib.b64').read_text().strip()
+          Path('/tmp/farming_deep_parity.patch').write_bytes(zlib.decompress(base64.b64decode(encoded)))
+          PY
+          patch -d "$PROJECT_DIR" -p2 < /tmp/farming_deep_parity.patch
+          grep -q '^mod_version=0.5.1-alpha$' "$PROJECT_DIR/gradle.properties"
+
       - name: Prepare Forge build
         shell: bash
         run: |
@@ -106,7 +118,7 @@ jobs:
           cd "$PROJECT_DIR"
           gradle --no-daemon clean build --stacktrace
 
-      - name: Validate 0.5.0 JAR
+      - name: Validate 0.5.1 JAR
         shell: bash
         run: |
           JAR="$(find "$PROJECT_DIR/build/libs" -maxdepth 1 -type f -name 'LoyalCrowns-Ender-Legacy-*.jar' ! -name '*sources*' -print -quit)"
@@ -116,11 +128,11 @@ jobs:
           grep -q 'com/loyacrown/enderlegacy/client/FarmingStationScreen.class' /tmp/jar-contents.txt
           grep -q 'com/loyacrown/enderlegacy/registry/LegacyMenus.class' /tmp/jar-contents.txt
           grep -q 'assets/loyacrowns_ender_legacy/textures/gui/farm_station.png' /tmp/jar-contents.txt
-          unzip -p "$JAR" META-INF/mods.toml | grep -q 'version="0.5.0-alpha"'
-          echo '0.5.0 Farming Station GUI/menu pass validated.'
+          unzip -p "$JAR" META-INF/mods.toml | grep -q 'version="0.5.1-alpha"'
+          echo '0.5.1 Farming Station GUI/behavior pass validated.'
 
       - uses: actions/upload-artifact@v4
         with:
-          name: LoyalCrowns-Ender-Legacy-1.20.1-0.5.0-alpha
+          name: LoyalCrowns-Ender-Legacy-1.20.1-0.5.1-alpha
           path: ${{ env.PROJECT_DIR }}/build/libs/*.jar
           if-no-files-found: error
