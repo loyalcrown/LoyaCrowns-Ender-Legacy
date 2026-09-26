@@ -1,0 +1,65 @@
+from pathlib import Path
+import json, zipfile, re, sys
+
+if len(sys.argv) != 3:
+    raise SystemExit("usage: upgrade_content.py <project-dir> <EnderIO-1.12.2-5.3.72.jar>")
+root=Path(sys.argv[1]).resolve()
+jar12=Path(sys.argv[2]).resolve()
+assets=root/'src/main/resources/assets/loyacrowns_ender_legacy'
+tex=assets/'textures/block'; models=assets/'models/block'; items=assets/'models/item'; states=assets/'blockstates'
+data=root/'src/main/resources/data/loyacrowns_ender_legacy'; recipes=data/'recipes'; loot=data/'loot_tables/blocks'
+for d in (tex,models,items,states,recipes,loot): d.mkdir(parents=True, exist_ok=True)
+
+def extract(src,dst):
+    with zipfile.ZipFile(jar12) as z: b=z.read(src)
+    dst=Path(dst); dst.parent.mkdir(parents=True,exist_ok=True); dst.write_bytes(b)
+
+def readj(src):
+    with zipfile.ZipFile(jar12) as z: return json.loads(z.read(src).decode())
+
+def writej(path,obj): Path(path).write_text(json.dumps(obj,indent=2)+'\n')
+
+# Exact 5.3.72 artwork needed for the Farming Station geometry.
+for out,src in {
+    'soul_machine_bottom_1_12.png':'assets/enderio/textures/blocks/block_soul_machine_bottom.png',
+    'soul_machine_top_1_12.png':'assets/enderio/textures/blocks/block_soul_machine_top.png',
+    'farm_base_top_1_12.png':'assets/enderio/textures/blocks/farm_base_top.png',
+    'farm_side_1_12.png':'assets/enderio/textures/blocks/farm_side.png',
+    'farm_hat_bottom_1_12.png':'assets/enderio/textures/blocks/farm_hat_bottom.png',
+    'farm_core_1_12.png':'assets/enderio/textures/blocks/farm_core.png',
+    'zombie_gen_body_1_12.png':'assets/enderio/textures/blocks/zombie_gen_body.png',
+    'zombie_gen_lid_1_12.png':'assets/enderio/textures/blocks/zombie_gen_lid.png',
+    'franken_zombie_gen_body_1_12.png':'assets/enderio/textures/blocks/franken_zombie_gen_body.png',
+    'franken_zombie_gen_lid_1_12.png':'assets/enderio/textures/blocks/franken_zombie_gen_lid.png',
+    'ender_gen_body_1_12.png':'assets/enderio/textures/blocks/ender_gen_body.png',
+    'ender_gen_lid_1_12.png':'assets/enderio/textures/blocks/ender_gen_lid.png',
+    'dark_steel_anvil_top_damaged_1_12.png':'assets/enderio/textures/blocks/anvil/1.png',
+    'dark_steel_anvil_top_very_damaged_1_12.png':'assets/enderio/textures/blocks/anvil/2.png',
+}.items(): extract(src,tex/out)
+
+# Use the exact Farming Station shape from 5.3.72 instead of a cube approximation.
+farm=readj('assets/enderio/models/block/block_farm_station.json')
+farm['textures']={
+    'particle':'loyacrowns_ender_legacy:block/soul_machine_bottom_1_12',
+    'machineTop':'loyacrowns_ender_legacy:block/soul_machine_top_1_12',
+    'farmBaseTop':'loyacrowns_ender_legacy:block/farm_base_top_1_12',
+    'machineBottom':'loyacrowns_ender_legacy:block/soul_machine_bottom_1_12',
+    'farmSide':'loyacrowns_ender_legacy:block/farm_side_1_12',
+    'farmHatBottom':'loyacrowns_ender_legacy:block/farm_hat_bottom_1_12',
+    'farmCore':'loyacrowns_ender_legacy:block/farm_core_1_12',
+}
+writej(models/'farming_station.json',farm)
+
+# Use the exact Dimensional Transceiver cage geometry from 5.3.72.
+trans=readj('assets/enderio/models/block/transceiver.json')
+trans['textures']={'all':'loyacrowns_ender_legacy:block/dimensional_transceiver_1_12','particle':'loyacrowns_ender_legacy:block/dimensional_transceiver_1_12'}
+writej(models/'dimensional_transceiver.json',trans)
+
+# Zombie-family jar geometry from 5.3.72. We intentionally omit the glass layer because
+# the legacy model used a translucent custom render pass; this preserves the exact frame/lid
+# silhouette without a solid-render transparency artifact in Forge 1.20.1.
+jar_model=readj('assets/enderio/models/block/zombie_jar.json')
+def make_jar_model(name,body,lid):
+    obj={'textures':{'particle':f'loyacrowns_ender_legacy:block/{body}','body':f'loyacrowns_ender_legacy:block/{body}','lid':f'loyacrowns_ender_legacy:block/{lid}'},'elements':jar_model['elements']}
+    writej(models/(name+'.json'),obj)
+    writej(states/(name+'.json'),{'variants':{'':{'model':f'loyacrowns_ender_l

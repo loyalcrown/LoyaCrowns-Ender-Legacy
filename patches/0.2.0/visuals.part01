@@ -1,0 +1,20 @@
+es = {'ender_rail_north_south.png': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAAadEVYdFNvZnR3YXJlAFBhaW50Lk5FVCB2My41LjEwMPRyoQAAATlJREFUOE9jgIElS5b8z8jI+A/l4gQgNSC1UC4ENKY7gAVBkjG+Bv8LY03/L2nwAuM1HUFg3J7r+j8j1AKsBqQWpAeqnYEhyFkDboCrtfp/ED/FXwsF+9iq/nc0U4UbAFID1Q4BMAOgXJwAZgCUiwAUGYAcBjmRNv/ZzHT/M8tJ/mc10gLTIMxubQiWgxmAMwxA/uQMcv0fl5XxPyIu9n9yZsZ//6R4sCFEhwFIcWN72//GxkYwBhkEEgPJwQwAsVEAsgEgp0+aMR1uAMgVIDGQHFYD0MMAZFv3tClgV4AMAnkH5C2i0gHIn1yhHmANIINgAQkKWFAagRlAu3QgEBeI0wVgb2AzADkMQHkBZAi3r9N/NktDCA3UDKKJDgNQugfZBtIEMwyUH0jOCyDN0tXZKGIwAyA8BgYAJ+ldfoYQp4AAAAAASUVORK5CYII=', 'ender_rail_north_south_reversed.png': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAAadEVYdFNvZnR3YXJlAFBhaW50Lk5FVCB2My41LjEwMPRyoQAAATpJREFUOE9jgIElS5b8z8jI+A/l4gQgNSC1UC4EBDlrgAVBko5mqv99bFX/5wbr/492U/2f4q8FxyA5mAEgPVDtDAyN6Q5wA2J8Df6357r+X9MR9L+v2AZMw9gZoRZwA0B6oNohAGYAlIsTwAyAchGAIgPQw4DNTPc/s5zkf1YjLTANwuzWhv9drdXhXsAZBjmRNv85g1z/x2Vl/I+Ii/2fnJnx3z8pHmwI0WEAUtzY3va/sbERjEEGgcRAcjADQGwUgGwAyOmTZkyHGwByBUgMJIfVAPQwANnWPW0K2BUgg0DeAXmLqHQACgOuUA+wBpBBsIAEBSxIDmYA7dKBQFwgTheAxLAagBwGoLgGGcLt6/SfzdIQQgM1g2ii80JhrCnYNpAmmGGg/EFyXgBplq7ORhGDGQDhMTAAAMWWXmuWU+s9AAAAAElFTkSuQmCC', 'ender_rail_east_west.png': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAAadEVYdFNvZnR3YXJlAFBhaW50Lk5FVCB2My41LjEwMPRyoQAAAUVJREFUOE+lk8FLAkEUxgfCIrt4jaDbkghRBomhQRkbHRJxQyjKDSxoKj1Ex05z0SDoEGH+AXvsf3zxvZ23ruIuC30wvHkz8/3m7WNWiYIgIK012ZRV8Nu08fY8s4YzOGvTUObhiBexedPcpZfuPq16Lq01GwQI4mjgku5U+QzOwmPtSnknxQjg1rYi0/JBOYyVbY7HFScCwGPtoQQAc75zxhUsba5Tbq/EERCsCcDaphKATRO1EBDvQf+qnlgB9gSQ2AN8Jwwf428yoyF9TX7If9IMzNQDzHErjMYYHnePmivBngAwn1EcgApwuwAu/S5Xhb2FgPkeoFyUDSNub/VuGZDpHeA70TAYpIEYK7UyvxEBpPYgTQKw6VT/AsR7gH8B7/733aPP1zpHmWfuwfmhQ4OLHbo+dei+VYpG5neQJgGEmVJ/0mpea1TW5RsAAAAASUVORK5CYII=', 'ender_rail_east_west_reversed.png': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAAadEVYdFNvZnR3YXJlAFBhaW50Lk5FVCB2My41LjEwMPRyoQAAATpJREFUOE9jgIElS5b8z8jI+A/lgoFAXOB/6epsFDGQGpBaKBcCgpw1wIIgSUcz1f8+tqr/OYNc/3P7Ov0HGQKiU/y1wHIwA0B6oNoZGBrTHeAGxPgawDWxWRpCaDNdMJ0RagE3AKQHqh0CYAaANHOFeoBdwCwn+Z/VSAtMgwwBicEMgGpDAJgBUC5OgNUA9DDA5QJXa3W4C3CGQU6kDVhD97Qp/xvb2/5PmjH9f1xWBsT5xIQBiA2yFaSxsbERjJMzM8AuAcnBDACxUQCyASAXgGyHGRARFwt2FUgOqwHoYQByLsjZII0g2/2T4sEGEJUOQGEACjCQBlgAgjC7tSFYDmYA3jDAB2AGQLkIQJEByGEAimsQH5T2kTEofxCdFwpjTf8vafAC4zUdQWDcnktCOsAHYAZAeAwMAKxbXX6U1Kb8AAAAAElFTkSuQmCC'}
+for out, encoded in embedded_legacy_rail_textures.items():
+    (tex/out).write_bytes(base64.b64decode(encoded))
+
+# Improve existing model texture fidelity using exact 1.12.2 art.
+def writej(path,obj):
+    Path(path).write_text(json.dumps(obj,indent=2)+"\n")
+
+writej(models/'combustion_generator.json', {
+  'parent':'minecraft:block/cube','textures':{
+    'down':'loyacrowns_ender_legacy:block/machine_bottom_1_12','up':'loyacrowns_ender_legacy:block/combustion_generator_top_1_12',
+    'north':'loyacrowns_ender_legacy:block/combustion_generator_1_12','south':'loyacrowns_ender_legacy:block/machine_side_1_12',
+    'west':'loyacrowns_ender_legacy:block/machine_side_1_12','east':'loyacrowns_ender_legacy:block/machine_side_1_12',
+    'particle':'loyacrowns_ender_legacy:block/machine_side_1_12'}})
+writej(models/'reservoir.json', {'parent':'minecraft:block/cube_all','textures':{'all':'loyacrowns_ender_legacy:block/reservoir_1_12'}})
+writej(models/'power_monitor.json', {'parent':'minecraft:block/cube','textures':{
+    'down':'loyacrowns_ender_legacy:block/machine_bottom_1_12','up':'loyacrowns_ender_legacy:block/machine_top_1_12',
+    'north':'loyacrowns_ender_legacy:block/power_monitor_1_12','south':'loyacrowns_ender_legacy:block/machine_side_1_12',
+    'west':'loyacrowns_ender_legacy:block/machine_side_1_12','east':'loyacrowns_ender_legacy:block/machine_side_1_12',
+    

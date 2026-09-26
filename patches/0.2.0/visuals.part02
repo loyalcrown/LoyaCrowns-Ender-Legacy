@@ -1,0 +1,46 @@
+'particle':'loyacrowns_ender_legacy:block/machine_side_1_12'}})
+writej(models/'dimensional_transceiver.json', {'parent':'minecraft:block/cube','textures':{
+    'down':'loyacrowns_ender_legacy:block/machine_bottom_1_12','up':'loyacrowns_ender_legacy:block/machine_top_1_12',
+    'north':'loyacrowns_ender_legacy:block/dimensional_transceiver_1_12','south':'loyacrowns_ender_legacy:block/machine_side_1_12',
+    'west':'loyacrowns_ender_legacy:block/machine_side_1_12','east':'loyacrowns_ender_legacy:block/machine_side_1_12',
+    'particle':'loyacrowns_ender_legacy:block/machine_side_1_12'}})
+writej(models/'photovoltaic_cell.json', {'parent':'minecraft:block/cube','textures':{
+    'down':'loyacrowns_ender_legacy:block/machine_bottom_1_12','up':'loyacrowns_ender_legacy:block/photovoltaic_cell_top_1_12',
+    'north':'loyacrowns_ender_legacy:block/photovoltaic_cell_side_1_12','south':'loyacrowns_ender_legacy:block/photovoltaic_cell_side_1_12',
+    'west':'loyacrowns_ender_legacy:block/photovoltaic_cell_side_1_12','east':'loyacrowns_ender_legacy:block/photovoltaic_cell_side_1_12',
+    'particle':'loyacrowns_ender_legacy:block/photovoltaic_cell_side_1_12'}})
+writej(models/'advanced_photovoltaic_cell.json', {'parent':'minecraft:block/cube','textures':{
+    'down':'loyacrowns_ender_legacy:block/machine_bottom_1_12','up':'loyacrowns_ender_legacy:block/advanced_photovoltaic_cell_top_1_12',
+    'north':'loyacrowns_ender_legacy:block/advanced_photovoltaic_cell_side_1_12','south':'loyacrowns_ender_legacy:block/advanced_photovoltaic_cell_side_1_12',
+    'west':'loyacrowns_ender_legacy:block/advanced_photovoltaic_cell_side_1_12','east':'loyacrowns_ender_legacy:block/advanced_photovoltaic_cell_side_1_12',
+    'particle':'loyacrowns_ender_legacy:block/advanced_photovoltaic_cell_side_1_12'}})
+writej(models/'farming_station.json', {'parent':'minecraft:block/cube','textures':{
+    'down':'loyacrowns_ender_legacy:block/machine_bottom_1_12','up':'loyacrowns_ender_legacy:block/farming_station_top_1_12',
+    'north':'loyacrowns_ender_legacy:block/farming_station_side_1_12','south':'loyacrowns_ender_legacy:block/farming_station_side_1_12',
+    'west':'loyacrowns_ender_legacy:block/farming_station_side_1_12','east':'loyacrowns_ender_legacy:block/farming_station_side_1_12',
+    'particle':'loyacrowns_ender_legacy:block/farming_station_side_1_12'}})
+
+# Correct 1.20 anvil geometry, with exact Ender IO 1.12.2 Dark Steel Anvil artwork.
+writej(models/'dark_steel_anvil.json', {
+  'parent':'minecraft:block/template_anvil',
+  'textures':{'particle':'loyacrowns_ender_legacy:block/dark_steel_anvil_body','body':'loyacrowns_ender_legacy:block/dark_steel_anvil_body','top':'loyacrowns_ender_legacy:block/dark_steel_anvil_top'}
+})
+writej(states/'dark_steel_anvil.json', {'variants':{
+    'facing=east':{'model':'loyacrowns_ender_legacy:block/dark_steel_anvil','y':270},
+    'facing=north':{'model':'loyacrowns_ender_legacy:block/dark_steel_anvil','y':180},
+    'facing=south':{'model':'loyacrowns_ender_legacy:block/dark_steel_anvil'},
+    'facing=west':{'model':'loyacrowns_ender_legacy:block/dark_steel_anvil','y':90},
+}})
+
+# Ender Rail model set covers every PoweredRailBlock state to prevent missing model/texture squares.
+for name,parent,texture in [
+    ('ender_rail_ns','minecraft:block/rail_flat','ender_rail_north_south'),
+    ('ender_rail_ew','minecraft:block/rail_flat','ender_rail_east_west'),
+    ('ender_rail_ns_rev','minecraft:block/rail_flat','ender_rail_north_south_reversed'),
+    ('ender_rail_ew_rev','minecraft:block/rail_flat','ender_rail_east_west_reversed'),
+    ('ender_rail_ne','minecraft:block/rail_raised_ne','ender_rail_north_south'),
+    ('ender_rail_sw','minecraft:block/rail_raised_sw','ender_rail_north_south'),
+    ('ender_rail_ne_rev','minecraft:block/rail_raised_ne','ender_rail_north_south_reversed'),
+    ('ender_rail_sw_rev','minecraft:block/rail_raised_sw','ender_rail_north_south_reversed'),
+]:
+    writej(models/(name+'.json'), {'parent':parent,'textures':{'

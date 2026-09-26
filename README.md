@@ -6,16 +6,19 @@ The project now uses **Ender IO 1.12.2-5.3.72** as the preferred legacy referenc
 
 ## Restored blocks
 
-Farming Station, Reservoir, Combustion Generator, Zombie Generator, Photovoltaic Cell, Advanced Photovoltaic Cell, Hyper Cube / deprecated Dimensional Transceiver, Dimensional Transceiver, Power Monitor, Graphical Power Monitor, The Vat, Wireless Charger, Killer Joe, Attractor Obelisk, Item Buffer, Power Buffer, Omni Buffer, Creative Buffer, Dark Steel Anvil, Painted Carpet, Ender Rail, Exit Rail, and the legacy Ender IO remote-access block.
+Farming Station, Reservoir, Combustion Generator, Zombie Generator, **Frank'n'Zombie Generator**, **Ender Generator**, Photovoltaic Cell, Advanced Photovoltaic Cell, Hyper Cube / deprecated Dimensional Transceiver, Dimensional Transceiver, Power Monitor, **Graphical Power Monitor**, The Vat, Wireless Charger, Killer Joe, Attractor Obelisk, Item Buffer, Power Buffer, Omni Buffer, Creative Buffer, Dark Steel Anvil, **Dark Paper Anvil**, Painted Carpet, Ender Rail, **Exit Rail**, and the legacy Ender IO remote-access block.
 
 ## 0.2.0-alpha — 1.12.2 reference pass
 
-- Dark Steel Anvil uses proper anvil geometry and the exact Ender IO 5.3.72 anvil body/top artwork.
-- Ender Rail now has complete powered-rail state coverage so curves/slopes/orientations do not fall back to missing models. Because Ender Rail was gone by 1.12.2, its exact surviving 1.7.10 rail textures are used.
-- Added **Exit Rail** from Ender IO 5.3.72 with the original texture and recreated eject/destroy minecart behavior.
-- Added **Graphical Power Monitor** using the 5.3.72 animated frame/screen artwork and the existing 1.20.1-compatible Power Monitor logic.
-- Farming Station, Reservoir, Combustion Generator, Power Monitor, Dimensional Transceiver, and Photovoltaic Cells now use 5.3.72 textures where practical.
-- CI now validates JSON plus every LoyalCrown-owned model and texture reference before publishing a JAR, specifically to catch missing-texture/model problems.
+- Dark Steel Anvil now uses proper anvil geometry plus the exact Ender IO 5.3.72 body/top artwork.
+- Ender Rail now has complete powered-rail state coverage so slopes/orientations do not fall back to missing models. Because Ender Rail was gone by 1.12.2, its surviving 1.7.10 rail artwork is used.
+- Added **Exit Rail** from Ender IO 5.3.72 with its exact texture and recreated eject/destroy minecart behavior.
+- Added **Graphical Power Monitor** with the 5.3.72 animated frame/screen artwork and the existing 1.20.1-compatible Power Monitor logic.
+- Added **Dark Paper Anvil** with the legacy anvil model/artwork and fragile block properties.
+- Added **Frank'n'Zombie Generator** and **Ender Generator** with 5.3.72 generator artwork and legacy default generation/buffer/fuel-duration values.
+- Farming Station now uses the exact 5.3.72 block geometry and textures rather than a cube approximation.
+- Reservoir, Combustion Generator, Power Monitor, Dimensional Transceiver, and Photovoltaic Cells now use 5.3.72 textures/models where practical.
+- CI validates JSON plus every registered LoyalCrown block's blockstate, item model, loot table, and owned model/texture references before publishing a JAR. This is specifically intended to catch missing-texture/model problems like the early anvil and rail issues.
 
 ## Farming Station
 
@@ -34,7 +37,7 @@ Still planned for closer legacy parity: a graphical Farming Station interface, s
 
 ## Build validation
 
-GitHub Actions compiles and reobfuscates the mod, validates resource JSON, checks model/texture references, checks the packaged metadata and required restored block models, and uploads a testable Forge JAR.
+GitHub Actions compiles and reobfuscates the mod, validates resource JSON, audits registered-block resources, checks model/texture references, verifies packaged metadata and key restored classes/models, and uploads a testable Forge JAR.
 
 The production Ender IO 6.2.15-beta release JAR cannot be used as a ForgeGradle mapped-userdev smoke-test dependency because its release mixins reference production/obfuscated names. Final runtime testing should therefore be done in a normal Forge 1.20.1 installation with Ender IO 6.2.15-beta.
 

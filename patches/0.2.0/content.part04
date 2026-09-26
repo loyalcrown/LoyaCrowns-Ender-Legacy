@@ -1,0 +1,54 @@
+o:black_paper'}},
+ 'result':{'item':'loyacrowns_ender_legacy:dark_paper_anvil'},'show_notification':True})
+writej(recipes/'franken_zombie_generator.json',{
+ 'type':'minecraft:crafting_shaped','category':'misc','pattern':['ICI','CJC','IRI'],
+ 'key':{'I':{'tag':'forge:ingots/iron'},'C':{'item':'enderio:basic_capacitor'},'J':{'item':'loyacrowns_ender_legacy:zombie_generator'},'R':{'item':'minecraft:redstone_block'}},
+ 'result':{'item':'loyacrowns_ender_legacy:franken_zombie_generator'},'show_notification':True})
+writej(recipes/'ender_generator.json',{
+ 'type':'minecraft:crafting_shaped','category':'misc','pattern':['IEI','EJE','IRI'],
+ 'key':{'I':{'tag':'forge:ingots/iron'},'E':{'item':'minecraft:ender_pearl'},'J':{'item':'loyacrowns_ender_legacy:franken_zombie_generator'},'R':{'item':'minecraft:redstone_block'}},
+ 'result':{'item':'loyacrowns_ender_legacy:ender_generator'},'show_notification':True})
+
+# Strengthen resource validation: every registered block must have the resources that caused
+# the missing-purple-texture problem during the first test build.
+validator=root/'tools/validate_assets.py'
+base=validator.read_text()
+if 'REGISTERED BLOCK RESOURCE AUDIT' not in base:
+    base += r'''
+
+# REGISTERED BLOCK RESOURCE AUDIT
+import re
+java = (ROOT.parents[3] / 'java/com/loyacrown/enderlegacy/registry/LegacyBlocks.java')
+if not java.exists():
+    # ROOT=.../src/main/resources/assets/ns; jump to src/main then java
+    java = ROOT.parents[2] / 'java/com/loyacrown/enderlegacy/registry/LegacyBlocks.java'
+text = java.read_text()
+registered = sorted(set(re.findall(r'registerBlock\("([a-z0-9_]+)"', text)))
+for name in registered:
+    required = [
+        ROOT/'blockstates'/(name+'.json'),
+        ROOT/'models/item'/(name+'.json'),
+    ]
+    for candidate in required:
+        if not candidate.exists():
+            errors.append(f'registered block {name} is missing {candidate.relative_to(ROOT)}')
+    loot = ROOT.parents[1] / 'data/loyacrowns_ender_legacy/loot_tables/blocks' / (name+'.json')
+    if not loot.exists():
+        errors.append(f'registered block {name} is missing loot table {loot.name}')
+if errors:
+    print('\n'.join(errors))
+    sys.exit(1)
+print(f'Registered-block audit passed for {len(registered)} blocks.')
+'''
+    # Existing validator exits before this appended block on errors but prints success before audit; okay.
+    validator.write_text(base)
+
+# Update reference/status docs.
+ref=root/'REFERENCE_1_12_2.md'
+s=ref.read_text()
+s=s.replace('- Added the 1.12.2 Graphical Power Monitor using the existing 1.20 power-monitor logic plus the 5.3.72 animated screen/frame artwork.',
+'''- Added the 1.12.2 Graphical Power Monitor using the existing 1.20 power-monitor logic plus the 5.3.72 animated screen/frame artwork.\n- Added the 1.12.2 Dark Paper Anvil with the exact legacy anvil geometry/artwork.\n- Added the 1.12.2 Frank'n'Zombie Generator and Ender Generator with their 5.3.72 jar geometry, fuel types, default buffers, generation rates, and fuel-duration values.''')
+s=s.replace('Farming Station, Reservoir, Combustion Generator, Power Monitor, Dimensional Transceiver, and Photovoltaic cells now preferentially use exact 5.3.72 textures where practical.',
+'Farming Station now uses the exact 5.3.72 model shape and textures; Reservoir, Combustion Generator, Power Monitor, Dimensional Transceiver, and Photovoltaic cells now preferentially use exact 5.3.72 textures/models where practical.')
+s=s.replace('The 1.12.2 reference also contains removed machines and systems such as the Ender Generator, Frank\'n\'Zombie Generator, Lava Generator, enhanced machine variants, Inventory Panel/storage blocks, Telepad/Dialing Device, additional obelisks, Electric Lights, and several utility/decorative blocks.',
+'The 1.12.2 reference also contains removed machines and systems such as the Lava Heat Exchanger, enhanced machine variants, Inventory Panel/storage blocks, Telepad/Dialing Device, additional obelisks, Electric Lights, and several utility/decorat

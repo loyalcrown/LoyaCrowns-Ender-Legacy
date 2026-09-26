@@ -1,0 +1,51 @@
+egacy:block/{name}'}}})
+    writej(items/(name+'.json'),{'parent':f'loyacrowns_ender_legacy:block/{name}'})
+make_jar_model('zombie_generator','zombie_gen_body_1_12','zombie_gen_lid_1_12')
+make_jar_model('franken_zombie_generator','franken_zombie_gen_body_1_12','franken_zombie_gen_lid_1_12')
+make_jar_model('ender_generator','ender_gen_body_1_12','ender_gen_lid_1_12')
+
+# Dark Paper Anvil used the exact same Ender IO anvil artwork, but was deliberately fragile.
+writej(models/'dark_paper_anvil.json',{
+  'parent':'minecraft:block/template_anvil',
+  'textures':{'particle':'loyacrowns_ender_legacy:block/dark_steel_anvil_body','body':'loyacrowns_ender_legacy:block/dark_steel_anvil_body','top':'loyacrowns_ender_legacy:block/dark_steel_anvil_top'}
+})
+writej(states/'dark_paper_anvil.json',{'variants':{
+    'facing=east':{'model':'loyacrowns_ender_legacy:block/dark_paper_anvil','y':270},
+    'facing=north':{'model':'loyacrowns_ender_legacy:block/dark_paper_anvil','y':180},
+    'facing=south':{'model':'loyacrowns_ender_legacy:block/dark_paper_anvil'},
+    'facing=west':{'model':'loyacrowns_ender_legacy:block/dark_paper_anvil','y':90},
+}})
+writej(items/'dark_paper_anvil.json',{'parent':'loyacrowns_ender_legacy:block/dark_paper_anvil'})
+
+# Graphical monitor's 5.3.72 face is slightly proud of the machine; keep the display visible
+# instead of hiding it inside a full 16x16 cube.
+p=models/'advanced_power_monitor.json'
+if p.exists():
+    adv=json.loads(p.read_text())
+    if adv.get('elements'):
+        base=adv['elements'][0]
+        if base.get('to') == [16,16,16]:
+            base['to']=[16,16,14.5]
+            # Remove south cullface if present; panel occupies this side.
+            if 'south' in base.get('faces',{}): base['faces']['south'].pop('cullface',None)
+        writej(p,adv)
+
+# Add two later 1.12 generator variants using the same fluid generator BE.
+lb=root/'src/main/java/com/loyacrown/enderlegacy/registry/LegacyBlocks.java'
+s=lb.read_text()
+needle='''    public static final RegistryObject<Block> ZOMBIE_GENERATOR = registerBlock("zombie_generator",\n            () -> new LegacyMachineBlock(machineProps(), () -> LegacyBlockEntities.ZOMBIE_GENERATOR.get()));'''
+replacement=needle+'''\n    public static final RegistryObject<Block> FRANKEN_ZOMBIE_GENERATOR = registerBlock("franken_zombie_generator",\n            () -> new LegacyMachineBlock(machineProps(), () -> LegacyBlockEntities.ZOMBIE_GENERATOR.get()));\n    public static final RegistryObject<Block> ENDER_GENERATOR = registerBlock("ender_generator",\n            () -> new LegacyMachineBlock(machineProps(), () -> LegacyBlockEntities.ZOMBIE_GENERATOR.get()));'''
+if 'FRANKEN_ZOMBIE_GENERATOR' not in s:
+    if needle not in s: raise SystemExit('Zombie registry insertion point not found')
+    s=s.replace(needle,replacement)
+needle='''    public static final RegistryObject<Block> DARK_STEEL_ANVIL = registerBlock("dark_steel_anvil",\n            () -> new LegacyDarkSteelAnvilBlock(BlockBehaviour.Properties.copy(Blocks.ANVIL).strength(8.0F, 1200.0F)));'''
+replacement=needle+'''\n    public static final RegistryObject<Block> DARK_PAPER_ANVIL = registerBlock("dark_paper_anvil",\n            () -> new LegacyDarkSteelAnvilBlock(BlockBehaviour.Properties.copy(Blocks.ANVIL).strength(0.6F, 1.0F)));'''
+if 'DARK_PAPER_ANVIL' not in s:
+    if needle not in s: raise SystemExit('Anvil registry insertion point not found')
+    s=s.replace(needle,replacement)
+lb.write_text(s)
+
+lbe=root/'src/main/java/com/loyacrown/enderlegacy/registry/LegacyBlockEntities.java'
+s=lbe.read_text()
+old='''    public static final RegistryObject<BlockEntityType<ZombieGeneratorBlockEntity>> ZOMBIE_GENERATOR = BLOCK_ENTITIES.register("zombie_generator",\n            () -> BlockEntityType.Builder.of(ZombieGeneratorBlockEntity::new, LegacyBlocks.ZOMBIE_GENERATOR.get()).build(null));'''
+new='''    public static final RegistryObject<BlockEntityType<ZombieGeneratorBlockEntity>> ZOMBIE_GENERATOR = BLOCK_ENTITIES.register("zombie_generato
