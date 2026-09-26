@@ -1,0 +1,9 @@
+ive blocks.')
+ref.write_text(s)
+
+ch=root/'CHANGELOG.md'
+s=ch.read_text()
+s=s.replace('- Added Graphical Power Monitor with 1.12.2 animated display art.', '''- Added Graphical Power Monitor with 1.12.2 animated display art.\n- Added Dark Paper Anvil.\n- Added Frank'n'Zombie Generator and Ender Generator with 5.3.72 fuel/generation defaults.\n- Farming Station now uses its exact 5.3.72 block geometry, not a cube approximation.''')
+ch.write_text(s)
+
+print('Applied additional 1.12.2 parity updates.')
