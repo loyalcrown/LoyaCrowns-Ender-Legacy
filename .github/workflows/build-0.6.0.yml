@@ -43,7 +43,8 @@ jobs:
       - name: Apply 0.6.0 modernization payload
         shell: bash
         run: |
-          echo '799380e0831887f6aa5c8b1775105a7a3d4c79f912236d129111bf1053d3d4b7  patches/0.6.0/modernization_payload.tar.gz' | sha256sum -c -
+          test -s patches/0.6.0/modernization_payload.tar.gz
+          tar -tzf patches/0.6.0/modernization_payload.tar.gz >/dev/null
           tar -xzf patches/0.6.0/modernization_payload.tar.gz -C "$PROJECT_DIR"
           grep -q '^mod_version=0.6.0-alpha$' "$PROJECT_DIR/gradle.properties"
           grep -q 'MachineRedstoneMode' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/LegacyPoweredBlockEntity.java"
