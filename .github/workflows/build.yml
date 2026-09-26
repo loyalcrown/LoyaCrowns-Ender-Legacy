@@ -39,6 +39,9 @@ jobs:
             sed -i 's/mod_version=0.1.0-alpha/mod_version=0.1.1-alpha/' LoyaCrowns-Ender-Legacy/gradle.properties
             echo 'Applied Farming Station 0.1.1 patch.'
           fi
+          if [ -f patches/0.1.1/fix_output.py ]; then
+            python patches/0.1.1/fix_output.py
+          fi
 
       - name: Prepare source snapshot
         working-directory: LoyaCrowns-Ender-Legacy
