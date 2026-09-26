@@ -3,6 +3,8 @@ name: Build LoyaCrown's Ender Legacy
 on:
   workflow_dispatch:
   push:
+    branches: [ "main", "dev/farming-station-0.1.1" ]
+  pull_request:
     branches: [ "main" ]
 
 jobs:
@@ -28,6 +30,15 @@ jobs:
           fi
           echo "Using $ZIP"
           unzip -q "$ZIP"
+
+      - name: Apply development patches
+        shell: bash
+        run: |
+          if [ -f patches/0.1.1/FarmingStationBlockEntity.java ]; then
+            cp patches/0.1.1/FarmingStationBlockEntity.java LoyaCrowns-Ender-Legacy/src/main/java/com/loyacrown/enderlegacy/blockentity/FarmingStationBlockEntity.java
+            sed -i 's/mod_version=0.1.0-alpha/mod_version=0.1.1-alpha/' LoyaCrowns-Ender-Legacy/gradle.properties
+            echo 'Applied Farming Station 0.1.1 patch.'
+          fi
 
       - name: Prepare source snapshot
         working-directory: LoyaCrowns-Ender-Legacy
@@ -77,6 +88,9 @@ jobs:
           done
           unzip -p "$JAR" META-INF/mods.toml | grep -q 'modId="enderio"'
           unzip -p "$JAR" META-INF/mods.toml | grep -q 'versionRange="\[6.2.15-beta,6.3)"'
+          if [ -f ../patches/0.1.1/FarmingStationBlockEntity.java ]; then
+            unzip -p "$JAR" META-INF/mods.toml | grep -q 'version="0.1.1-alpha"'
+          fi
           echo 'Release JAR structure and Ender IO dependency metadata validated.'
 
       - uses: actions/upload-artifact@v4
