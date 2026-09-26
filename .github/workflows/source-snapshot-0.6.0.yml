@@ -15,6 +15,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
+
       - name: Download validated 0.5.9 source snapshot
         shell: bash
         env:
@@ -33,30 +43,33 @@ jobs:
           grep -q '^mod_version=0.5.9-alpha$' "$PROJECT_DIR/gradle.properties"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Apply 0.6.0 modernization payload
+      - name: Apply 0.6.0 modernization patch
         shell: bash
         run: |
-          test -s patches/0.6.0/modernization_payload.tar.gz
-          tar -tzf patches/0.6.0/modernization_payload.tar.gz >/dev/null
-          tar -xzf patches/0.6.0/modernization_payload.tar.gz -C "$PROJECT_DIR"
+          python patches/0.6.0/apply_modernization_patch.py "$PROJECT_DIR"
           grep -q '^mod_version=0.6.0-alpha$' "$PROJECT_DIR/gradle.properties"
           grep -q 'MachineRedstoneMode' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/LegacyPoweredBlockEntity.java"
+          grep -q 'MachineIOMode' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/FarmingStationBlockEntity.java"
           grep -q 'Side Configuration' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/client/FarmingStationScreen.java"
+          grep -q 'REDSTONE_BUTTON_ID' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/menu/FarmingStationMenu.java"
           python "$PROJECT_DIR/tools/validate_assets.py"
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+      - name: Prepare Forge build
+        shell: bash
+        run: |
+          python - "$PROJECT_DIR" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1])/'build.gradle'
+          p.write_text('\n'.join(line for line in p.read_text().splitlines() if 'com.enderio:enderio:' not in line and 'com.enderio:EnderIO:' not in line)+'\n')
+          PY
 
       - name: Build reconstructed 0.6.0 mod
         shell: bash
         run: |
           cd "$PROJECT_DIR"
-          chmod +x gradlew
-          ./gradlew clean build --no-daemon --stacktrace
-          JAR_PATH="$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*sources*' ! -name '*dev*' -print -quit)"
+          gradle --no-daemon clean build --stacktrace
+          JAR_PATH="$(find build/libs -maxdepth 1 -type f -name 'LoyalCrowns-Ender-Legacy-*.jar' ! -name '*sources*' ! -name '*dev*' -print -quit)"
           test -n "$JAR_PATH"
           cp "$JAR_PATH" "$GITHUB_WORKSPACE/LoyalCrowns-Ender-Legacy-1.20.1-0.6.0-alpha.jar"
 
