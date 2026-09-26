@@ -1,0 +1,74 @@
+from pathlib import Path
+import json, zipfile, shutil, copy, base64, sys
+
+if len(sys.argv) != 3:
+    raise SystemExit("usage: upgrade_visuals.py <project-dir> <EnderIO-1.12.2-5.3.72.jar>")
+root=Path(sys.argv[1]).resolve()
+jar12=Path(sys.argv[2]).resolve()
+res=root/'src/main/resources'
+assets=res/'assets/loyacrowns_ender_legacy'
+tex=assets/'textures/block'
+models=assets/'models/block'
+items=assets/'models/item'
+states=assets/'blockstates'
+data=res/'data/loyacrowns_ender_legacy'
+recipes=data/'recipes'
+loot=data/'loot_tables/blocks'
+for d in [tex,models,items,states,recipes,loot]: d.mkdir(parents=True, exist_ok=True)
+
+# Branding/version made permanent in the source snapshot.
+gp=root/'gradle.properties'
+s=gp.read_text()
+s=s.replace("mod_name=LoyaCrown's Ender Legacy", "mod_name=LoyalCrown's Ender Legacy")
+s=s.replace('mod_version=0.1.1-alpha','mod_version=0.2.0-alpha')
+gp.write_text(s)
+
+bg=root/'build.gradle'
+s=bg.read_text().replace('LoyaCrowns-Ender-Legacy-${minecraft_version}','LoyalCrowns-Ender-Legacy-${minecraft_version}')
+s=s.replace("'Specification-Vendor': 'LoyaCrown'", "'Specification-Vendor': 'LoyalCrown'")
+s=s.replace("'Implementation-Vendor': 'LoyaCrown'", "'Implementation-Vendor': 'LoyalCrown'")
+bg.write_text(s)
+
+mods=res/'META-INF/mods.toml'
+s=mods.read_text().replace('authors="LoyaCrown"','authors="LoyalCrown"')
+mods.write_text(s)
+
+readme=root/'README.md'
+s=readme.read_text().replace("# LoyaCrown's Ender Legacy", "# LoyalCrown's Ender Legacy")
+readme.write_text(s)
+
+# exact texture extraction helpers
+def extract(jar, src, dst):
+    with zipfile.ZipFile(jar) as z:
+        b=z.read(src)
+    dst=Path(dst); dst.parent.mkdir(parents=True, exist_ok=True); dst.write_bytes(b)
+
+# 1.12.2 textures are now the preferred visual reference when that block still existed there.
+exact12={
+    'machine_side_1_12.png':'assets/enderio/textures/blocks/block_machine_side.png',
+    'machine_top_1_12.png':'assets/enderio/textures/blocks/block_machine_top.png',
+    'machine_bottom_1_12.png':'assets/enderio/textures/blocks/block_machine_bottom.png',
+    'combustion_generator_1_12.png':'assets/enderio/textures/blocks/combustion_gen_front.png',
+    'combustion_generator_top_1_12.png':'assets/enderio/textures/blocks/combustion_gen_top.png',
+    'reservoir_1_12.png':'assets/enderio/textures/blocks/reservoir.png',
+    'power_monitor_1_12.png':'assets/enderio/textures/blocks/power_monitor.png',
+    'dimensional_transceiver_1_12.png':'assets/enderio/textures/blocks/block_transceiver.png',
+    'photovoltaic_cell_side_1_12.png':'assets/enderio/textures/blocks/solar_panel_normal_side.png',
+    'photovoltaic_cell_top_1_12.png':'assets/enderio/textures/blocks/solar_panel_normal_top.png',
+    'advanced_photovoltaic_cell_side_1_12.png':'assets/enderio/textures/blocks/solar_panel_advanced_side.png',
+    'advanced_photovoltaic_cell_top_1_12.png':'assets/enderio/textures/blocks/solar_panel_advanced_top.png',
+    'farming_station_side_1_12.png':'assets/enderio/textures/blocks/farm_side.png',
+    'farming_station_top_1_12.png':'assets/enderio/textures/blocks/farm_base_top.png',
+    'exit_rail.png':'assets/enderio/textures/blocks/block_exit_rail.png',
+    'dark_steel_anvil_body.png':'assets/enderio/textures/blocks/anvil/base.png',
+    'dark_steel_anvil_top.png':'assets/enderio/textures/blocks/anvil/0.png',
+    'advanced_power_monitor_frame.png':'assets/enderio/textures/blocks/block_pm_on_frame.png',
+    'advanced_power_monitor_screen.png':'assets/enderio/textures/blocks/block_pm_on.png',
+}
+for out,src in exact12.items(): extract(jar12,src,tex/out)
+# animation metadata for the monitor is valid in 1.20.1 too.
+extract(jar12,'assets/enderio/textures/blocks/block_pm_on_frame.png.mcmeta',tex/'advanced_power_monitor_frame.png.mcmeta')
+extract(jar12,'assets/enderio/textures/blocks/block_pm_on.png.mcmeta',tex/'advanced_power_monitor_screen.png.mcmeta')
+
+# Ender Rail was removed before 1.12.2; embed its last legacy art from the 1.7.10 reference.
+embedded_legacy_rail_textur
