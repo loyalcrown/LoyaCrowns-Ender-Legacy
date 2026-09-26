@@ -1,0 +1,59 @@
+rail':f'loyacrowns_ender_legacy:block/{texture}'}})
+variants={}
+# mirror vanilla powered-rail key set; powered is used as the old rail's reversed visual state.
+for powered,suf in [(False,''),(True,'_rev')]:
+    p=str(powered).lower()
+    variants[f'powered={p},shape=north_south']={'model':f'loyacrowns_ender_legacy:block/ender_rail_ns{suf}'}
+    variants[f'powered={p},shape=east_west']={'model':f'loyacrowns_ender_legacy:block/ender_rail_ew{suf}'}
+    variants[f'powered={p},shape=ascending_east']={'model':f'loyacrowns_ender_legacy:block/ender_rail_ne{suf}','y':90}
+    variants[f'powered={p},shape=ascending_west']={'model':f'loyacrowns_ender_legacy:block/ender_rail_sw{suf}','y':90}
+    variants[f'powered={p},shape=ascending_north']={'model':f'loyacrowns_ender_legacy:block/ender_rail_ne{suf}'}
+    variants[f'powered={p},shape=ascending_south']={'model':f'loyacrowns_ender_legacy:block/ender_rail_sw{suf}'}
+writej(states/'ender_rail.json', {'variants':variants})
+writej(items/'ender_rail.json', {'parent':'loyacrowns_ender_legacy:block/ender_rail_ns'})
+
+# 1.12.2 Exit Rail successor: exact texture and six valid rail shapes.
+for name,parent in [('exit_rail','minecraft:block/rail_flat'),('exit_rail_ne','minecraft:block/rail_raised_ne'),('exit_rail_sw','minecraft:block/rail_raised_sw')]:
+    writej(models/(name+'.json'), {'parent':parent,'textures':{'rail':'loyacrowns_ender_legacy:block/exit_rail'}})
+variants={}
+for powered in [False,True]:
+    p=str(powered).lower()
+    variants[f'powered={p},shape=north_south']={'model':'loyacrowns_ender_legacy:block/exit_rail'}
+    variants[f'powered={p},shape=east_west']={'model':'loyacrowns_ender_legacy:block/exit_rail','y':90}
+    variants[f'powered={p},shape=ascending_east']={'model':'loyacrowns_ender_legacy:block/exit_rail_ne','y':90}
+    variants[f'powered={p},shape=ascending_west']={'model':'loyacrowns_ender_legacy:block/exit_rail_sw','y':90}
+    variants[f'powered={p},shape=ascending_north']={'model':'loyacrowns_ender_legacy:block/exit_rail_ne'}
+    variants[f'powered={p},shape=ascending_south']={'model':'loyacrowns_ender_legacy:block/exit_rail_sw'}
+writej(states/'exit_rail.json',{'variants':variants})
+writej(items/'exit_rail.json',{'parent':'loyacrowns_ender_legacy:block/exit_rail'})
+
+# Graphical Power Monitor: base cube + exact 1.12.2 frame/screen geometry overlay.
+with zipfile.ZipFile(jar12) as z:
+    panel=json.loads(z.read('assets/enderio/models/block/block_advanced_power_monitor.json').decode())
+    face=json.loads(z.read('assets/enderio/models/block/block_advanced_power_monitor_itemfront.json').decode())
+base_cube={
+ 'from':[0,0,0],'to':[16,16,16],
+ 'faces':{
+   'down':{'texture':'#bottom','cullface':'down'},'up':{'texture':'#top','cullface':'up'},
+   'north':{'texture':'#side','cullface':'north'},'south':{'texture':'#side','cullface':'south'},
+   'west':{'texture':'#side','cullface':'west'},'east':{'texture':'#side','cullface':'east'}
+ }}
+# old panel sits at the south face; preserve that exact geometry.
+adv_model={
+ 'textures':{
+   'particle':'loyacrowns_ender_legacy:block/machine_side_1_12',
+   'bottom':'loyacrowns_ender_legacy:block/machine_bottom_1_12',
+   'top':'loyacrowns_ender_legacy:block/machine_top_1_12',
+   'side':'loyacrowns_ender_legacy:block/machine_side_1_12',
+   'texture':'loyacrowns_ender_legacy:block/advanced_power_monitor_frame',
+   'fakeface':'loyacrowns_ender_legacy:block/advanced_power_monitor_screen',
+ },
+ 'elements':[base_cube]+panel.get('elements',[])+face.get('elements',[])
+}
+writej(models/'advanced_power_monitor.json',adv_model)
+writej(states/'advanced_power_monitor.json',{'variants':{'':{'model':'loyacrowns_ender_legacy:block/advanced_power_monitor'}}})
+writej(items/'advanced_power_monitor.json',{'parent':'loyacrowns_ender_legacy:block/advanced_power_monitor'})
+
+# New Java block: 1.12 Exit Rail behavior (eject riders then destroy non-furnace minecart).
+exit_java=root/'src/main/java/com/loyacrown/enderlegacy/block/LegacyExitRailBlock.java'
+exit_java.write_text('
