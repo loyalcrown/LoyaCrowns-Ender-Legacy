@@ -53,7 +53,7 @@ jobs:
           import base64, hashlib, zlib
           encoded = Path('/tmp/inventory_jei_sync.b64').read_text().replace('\n','').strip()
           decoded = zlib.decompress(base64.b64decode(encoded, validate=True))
-          assert hashlib.sha256(decoded).hexdigest() == 'ed1115ebd93ebd5f84c48e00d93976611fbc22248ee1b49e56baf8d961cbad59'
+          assert hashlib.sha256(decoded).hexdigest() == 'fa519fda17ecf81644d9cc028ac205177dc0a1d388df53cadc33aa939b754a06'
           Path('/tmp/inventory_jei_sync.patch').write_bytes(decoded)
           PY
           patch -d "$PROJECT_DIR" -p1 < /tmp/inventory_jei_sync.patch
@@ -63,6 +63,7 @@ jobs:
           grep -q 'isJeiSyncEnabled' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/menu/InventoryPanelMenu.java"
           grep -q 'JeiSearchBridge' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/client/InventoryPanelScreen.java"
           grep -q '@JeiPlugin' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/client/compat/jei/EnderLegacyJeiPlugin.java"
+          grep -q 'jei-1.20.1-common-api:15.20.0.118' "$PROJECT_DIR/build.gradle"
           grep -q 'jei-1.20.1-forge-api:15.20.0.118' "$PROJECT_DIR/build.gradle"
 
       - name: Prepare Forge build
