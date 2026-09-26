@@ -1,0 +1,6 @@
+y Panel/storage blocks, Telepad/Dialing Device, additional obelisks, Electric Lights, and several utility/decorative blocks. These need individual 1.20.1 ports so they do not duplicate blocks already present in Ender IO 6.2.15-beta.\n''')
+
+# Changelog.
+(root/'CHANGELOG.md').write_text('''# Changelog\n\n## 0.2.0-alpha\n- Switched the visual reference forward to Ender IO 1.12.2-5.3.72 where applicable.\n- Fixed Dark Steel Anvil geometry/texture.\n- Fixed Ender Rail blockstate coverage and restored original Ender Rail art.\n- Added 1.12.2 Exit Rail with legacy eject/destroy behavior.\n- Added Graphical Power Monitor with 1.12.2 animated display art.\n- Updated several existing machine textures to their 1.12.2 versions.\n- Added automated missing-model/missing-texture validation.\n- Kept Minecraft 1.20.1, Forge 47.4.x, Java 17, and Ender IO 6.2.15-beta compatibility target.\n\n## 0.1.1-alpha\n- Expanded Farming Station crop/tree handling and output routing.\n''')
+
+print('Upgraded source to 0.2.0-alpha')
