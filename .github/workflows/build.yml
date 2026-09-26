@@ -90,6 +90,7 @@ jobs:
           Path('/tmp/deep_parity.py').write_bytes(zlib.decompress(base64.b64decode(encoded)))
           PY
           python /tmp/deep_parity.py "$PROJECT_DIR" "$GITHUB_WORKSPACE/EnderIO-1.12.2-5.3.72.jar"
+          python patches/0.4.0/fix_simple_crafter.py "$PROJECT_DIR"
           grep -q '^mod_version=0.4.0-alpha$' "$PROJECT_DIR/gradle.properties"
 
       - name: Prepare Forge build
