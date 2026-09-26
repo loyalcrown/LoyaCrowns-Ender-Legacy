@@ -52,9 +52,9 @@ jobs:
           patch -d "$PROJECT_DIR" -p1 < /tmp/inventory_power_nutrient.patch
           grep -q '^mod_version=0.5.7-alpha$' "$PROJECT_DIR/gradle.properties"
           grep -q 'NUTRIENT_CAPACITY = 2_000' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/InventoryPanelBlockEntity.java"
-          grep -q 'PANEL_POWER_PER_MB = 800.0F' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/InventoryPanelBlockEntity.java"
+          grep -q 'POWER_PER_MB = 800.0F' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/InventoryPanelBlockEntity.java"
           grep -q 'consumeExtractionPower' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/util/NetworkInventoryContainer.java"
-          grep -q 'getNutrientAmount' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/menu/InventoryPanelMenu.java"
+          grep -q 'getNutrientStored' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/menu/InventoryPanelMenu.java"
 
       - name: Prepare Forge build
         shell: bash
