@@ -37,6 +37,8 @@ The addon deliberately does **not** duplicate legacy blocks that already have a 
 
 The Farming Station now more closely follows the 1.7.10 machine: dedicated hoe/axe/supply/output/capacitor slots, legacy-style capacitor range upgrades, automatic tilling, vanilla crop farming, sapling planting/tree chopping, and melon/pumpkin/sugar-cane/cactus harvesting. See `patches/0.1.1/CHANGELOG.md` for details.
 
+Still planned for closer legacy parity: a graphical Farming Station interface, supply-slot locking, fake-player enchantment behavior, and broader modded-crop farmer handlers.
+
 ## Target
 
 - Minecraft: **1.20.1**
