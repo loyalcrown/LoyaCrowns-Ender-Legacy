@@ -1,0 +1,220 @@
+            clearNotification();
+            return true;
+        }
+        if (state.is(FORGE_CROPS) && tryHarvestTaggedCrop(serverLevel, pos, state)) {
+            return true;
+        }
+        if (state.is(Blocks.MELON) || state.is(Blocks.PUMPKIN)) {
+            if (!consumeEnergy(CROP_ACTION_ENERGY)) return false;
+            List<ItemStack> drops = getDropsUsingTool(serverLevel, pos, state, hasAxe() ? findToolSlot(ToolKind.AXE) : findToolSlot(ToolKind.HOE));
+            serverLevel.removeBlock(pos, false);
+            storeDrops(serverLevel, pos, drops);
+            clearNotification();
+            return true;
+        }
+        if (state.is(Blocks.SUGAR_CANE) || state.is(Blocks.CACTUS)) {
+            return harvestColumn(serverLevel, pos, state.getBlock());
+        }
+        if (state.is(BlockTags.LOGS) && looksLikeTree(serverLevel, pos)) {
+            return harvestTree(serverLevel, pos);
+        }
+        return false;
+    }
+
+    private boolean harvestColumn(ServerLevel level, BlockPos base, Block block) {
+        // Leave the bottom block planted and harvest up to the next three growth blocks.
+        if (!level.getBlockState(base.below()).is(block)) {
+            for (int dy = 1; dy <= 3; dy++) {
+                BlockPos target = base.above(dy);
+                BlockState state = level.getBlockState(target);
+                if (!state.is(block)) break;
+                if (!consumeEnergy(CROP_ACTION_ENERGY)) return false;
+                List<ItemStack> drops = Block.getDrops(state, level, target, level.getBlockEntity(target));
+                level.removeBlock(target, false);
+                storeDrops(level, target, drops);
+                clearNotification();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean looksLikeTree(ServerLevel level, BlockPos base) {
+        for (int y = 1; y <= 10; y++) {
+            BlockPos center = base.above(y);
+            for (int x = -2; x <= 2; x++) {
+                for (int z = -2; z <= 2; z++) {
+                    if (level.getBlockState(center.offset(x, 0, z)).is(BlockTags.LEAVES)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean harvestTree(ServerLevel level, BlockPos base) {
+        if (!hasAxe()) {
+            setNotification("Needs an axe");
+            return false;
+        }
+        if (energy.getEnergyStored() < AXE_ACTION_ENERGY) {
+            return false;
+        }
+
+        ArrayDeque<BlockPos> open = new ArrayDeque<>();
+        Set<BlockPos> visited = new HashSet<>();
+        open.add(base);
+        int chopped = 0;
+
+        while (!open.isEmpty() && chopped < 128 && hasAxe()) {
+            BlockPos pos = open.removeFirst();
+            if (!visited.add(pos)) continue;
+            if (pos.getY() < base.getY() || pos.getY() > base.getY() + 24) continue;
+            if (Math.abs(pos.getX() - base.getX()) > 6 || Math.abs(pos.getZ() - base.getZ()) > 6) continue;
+
+            BlockState state = level.getBlockState(pos);
+            if (!state.is(BlockTags.LOGS)) continue;
+            if (!consumeEnergy(AXE_ACTION_ENERGY)) break;
+
+            List<ItemStack> drops = getDropsUsingTool(level, pos, state, findToolSlot(ToolKind.AXE));
+            level.removeBlock(pos, false);
+            storeDrops(level, pos, drops);
+            damageTool(level, findToolSlot(ToolKind.AXE));
+            chopped++;
+
+            for (Direction direction : Direction.values()) {
+                open.addLast(pos.relative(direction));
+            }
+        }
+
+        if (chopped > 0) {
+            clearNotification();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean tryPrepareSoil(ServerLevel serverLevel, BlockPos plantPos) {
+        if (!serverLevel.getBlockState(plantPos).isAir()) {
+            return false;
+        }
+        BlockPos soilPos = plantPos.below();
+        BlockState soil = serverLevel.getBlockState(soilPos);
+        if (!(soil.is(Blocks.DIRT) || soil.is(Blocks.GRASS_BLOCK) || soil.is(Blocks.COARSE_DIRT) || soil.is(Blocks.DIRT_PATH))) {
+            return false;
+        }
+        if (!hasCropSeedFor(plantPos)) {
+            return false;
+        }
+        if (!hasHoe()) {
+            setNotification("Needs a hoe");
+            return false;
+        }
+        if (!consumeEnergy(CROP_ACTION_ENERGY)) {
+            return false;
+        }
+
+        serverLevel.setBlock(soilPos, Blocks.FARMLAND.defaultBlockState(), Block.UPDATE_ALL);
+        damageTool(serverLevel, findToolSlot(ToolKind.HOE));
+        clearNotification();
+        return true;
+    }
+
+    private boolean tryPlant(ServerLevel serverLevel, BlockPos plantPos) {
+        if (!serverLevel.getBlockState(plantPos).isAir()) {
+            return false;
+        }
+        BlockState soil = serverLevel.getBlockState(plantPos.below());
+
+        if (soil.is(Blocks.FARMLAND)) {
+            if (tryPlant(serverLevel, plantPos, Items.WHEAT_SEEDS, Blocks.WHEAT.defaultBlockState())
+                    || tryPlant(serverLevel, plantPos, Items.CARROT, Blocks.CARROTS.defaultBlockState())
+                    || tryPlant(serverLevel, plantPos, Items.POTATO, Blocks.POTATOES.defaultBlockState())
+                    || tryPlant(serverLevel, plantPos, Items.BEETROOT_SEEDS, Blocks.BEETROOTS.defaultBlockState())
+                    || tryPlant(serverLevel, plantPos, Items.MELON_SEEDS, Blocks.MELON_STEM.defaultBlockState())
+                    || tryPlant(serverLevel, plantPos, Items.PUMPKIN_SEEDS, Blocks.PUMPKIN_STEM.defaultBlockState())) {
+                return true;
+            }
+            if (tryPlantGenericSupply(serverLevel, plantPos)) {
+                return true;
+            }
+        }
+        if (soil.is(Blocks.SOUL_SAND)) {
+            return tryPlant(serverLevel, plantPos, Items.NETHER_WART, Blocks.NETHER_WART.defaultBlockState());
+        }
+
+        // Legacy Farming Station also supported trees. These cover all vanilla 1.20.1 saplings.
+        if (soil.is(BlockTags.DIRT)) {
+            return tryPlant(serverLevel, plantPos, Items.OAK_SAPLING, Blocks.OAK_SAPLING.defaultBlockState())
+                    || tryPlant(serverLevel, plantPos, Items.SPRUCE_SAPLING, Blocks.SPRUCE_SAPLING.defaultBlockState())
+                    || tryPlant(serverLevel, plantPos, Items.BIRCH_SAPLING, Blocks.BIRCH_SAPLING.defaultBlockState())
+                    || tryPlant(serverLevel, plantPos, Items.JUNGLE_SAPLING, Blocks.JUNGLE_SAPLING.defaultBlockState())
+                    || tryPlant(serverLevel, plantPos, Items.ACACIA_SAPLING, Blocks.ACACIA_SAPLING.defaultBlockState())
+                    || tryPlant(serverLevel, plantPos, Items.DARK_OAK_SAPLING, Blocks.DARK_OAK_SAPLING.defaultBlockState())
+                    || tryPlant(serverLevel, plantPos, Items.CHERRY_SAPLING, Blocks.CHERRY_SAPLING.defaultBlockState());
+        }
+
+        if (tryPlantCocoa(serverLevel, plantPos)) {
+            return true;
+        }
+
+        // Vertical vanilla plants that the old farmer family also handled.
+        if (tryPlantIfSurvives(serverLevel, plantPos, Items.SUGAR_CANE, Blocks.SUGAR_CANE.defaultBlockState())) return true;
+        if (tryPlantIfSurvives(serverLevel, plantPos, Items.CACTUS, Blocks.CACTUS.defaultBlockState())) return true;
+
+        // Generic Forge/mod crop support. Most modded seeds are BlockItems backed by
+        // CropBlock/StemBlock/SaplingBlock subclasses, so this works without a hard dependency.
+        return tryPlantGenericSupply(serverLevel, plantPos);
+    }
+
+    private boolean tryPlant(ServerLevel level, BlockPos pos, Item seed, BlockState plantedState) {
+        int slot = findSupply(seed, pos);
+        if (slot < 0) return false;
+        if (!plantedState.canSurvive(level, pos)) return false;
+        if (!consumeEnergy(CROP_ACTION_ENERGY)) return false;
+
+        inventory.extractItem(slot, 1, false);
+        level.setBlock(pos, plantedState, Block.UPDATE_ALL);
+        clearNotification();
+        return true;
+    }
+
+    private boolean tryPlantIfSurvives(ServerLevel level, BlockPos pos, Item item, BlockState plantedState) {
+        return tryPlant(level, pos, item, plantedState);
+    }
+
+    private boolean tryPlantCocoa(ServerLevel level, BlockPos pos) {
+        int slot = findSupply(Items.COCOA_BEANS, pos);
+        if (slot < 0) return false;
+        for (Direction facing : Direction.Plane.HORIZONTAL) {
+            BlockState cocoa = Blocks.COCOA.defaultBlockState().setValue(CocoaBlock.FACING, facing);
+            if (!cocoa.canSurvive(level, pos)) continue;
+            if (!consumeEnergy(CROP_ACTION_ENERGY)) return false;
+            inventory.extractItem(slot, 1, false);
+            level.setBlock(pos, cocoa, Block.UPDATE_ALL);
+            clearNotification();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean tryPlantGenericSupply(ServerLevel level, BlockPos pos) {
+        int slot = supplySlotFor(pos);
+        ItemStack supply = inventory.getStackInSlot(slot);
+        if (!(supply.getItem() instanceof BlockItem blockItem)) return false;
+        Block block = blockItem.getBlock();
+        if (!isSupportedPlantBlock(block)) return false;
+        BlockState plantedState = block.defaultBlockState();
+        if (!plantedState.canSurvive(level, pos)) return false;
+        if (!consumeEnergy(CROP_ACTION_ENERGY)) return false;
+
+        inventory.extractItem(slot, 1, false);
+        level.setBlock(pos, plantedState, Block.UPDATE_ALL);
+        clearNotification();
+        return true;
+    }
+
+    private int supplySlotFor(BlockPos pos) {
+        int dx = pos.getX() - worldPosition.getX();
+        int dz = pos.getZ() - worldPosition.getZ();
