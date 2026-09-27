@@ -1,0 +1,220 @@
+        // SkyFactory 3 GUI order: SW, SE, NW, NE. Axis-center positions are
+        // assigned consistently to east/south so each farm block has one supply quadrant.
+        boolean east = dx >= 0;
+        boolean south = dz >= 0;
+        if (south) return east ? FIRST_SUPPLY_SLOT + 1 : FIRST_SUPPLY_SLOT;
+        return east ? FIRST_SUPPLY_SLOT + 3 : FIRST_SUPPLY_SLOT + 2;
+    }
+
+    private int findSupply(Item item, BlockPos pos) {
+        int slot = supplySlotFor(pos);
+        return inventory.getStackInSlot(slot).is(item) ? slot : -1;
+    }
+
+    private boolean hasCropSeedFor(BlockPos pos) {
+        int slot = supplySlotFor(pos);
+        ItemStack supply = inventory.getStackInSlot(slot);
+        if (supply.is(Items.WHEAT_SEEDS) || supply.is(Items.CARROT) || supply.is(Items.POTATO)
+                || supply.is(Items.BEETROOT_SEEDS) || supply.is(Items.MELON_SEEDS) || supply.is(Items.PUMPKIN_SEEDS)) {
+            return true;
+        }
+        if (supply.getItem() instanceof BlockItem blockItem) {
+            Block block = blockItem.getBlock();
+            return block instanceof CropBlock || block instanceof StemBlock;
+        }
+        return false;
+    }
+
+    private boolean hasEmptyOutputSlot() {
+        for (int slot = FIRST_OUTPUT_SLOT; slot <= LAST_OUTPUT_SLOT; slot++) {
+            if (inventory.getStackInSlot(slot).isEmpty()) return true;
+        }
+        return false;
+    }
+
+    private void storeDrops(ServerLevel serverLevel, BlockPos pos, List<ItemStack> drops) {
+        for (ItemStack drop : drops) {
+            ItemStack remainder = insertIntoOutput(drop);
+            if (!remainder.isEmpty()) {
+                Block.popResource(serverLevel, pos, remainder);
+            }
+        }
+    }
+
+    /**
+     * Output slots reject external insertion, so harvested items are merged internally
+     * with setStackInSlot instead of ItemStackHandler.insertItem().
+     */
+    private ItemStack insertIntoOutput(ItemStack stack) {
+        ItemStack remainder = stack.copy();
+        for (int slot = FIRST_OUTPUT_SLOT; slot <= LAST_OUTPUT_SLOT && !remainder.isEmpty(); slot++) {
+            ItemStack existing = inventory.getStackInSlot(slot);
+            if (existing.isEmpty()) {
+                int move = Math.min(remainder.getCount(), Math.min(remainder.getMaxStackSize(), inventory.getSlotLimit(slot)));
+                ItemStack placed = remainder.copy();
+                placed.setCount(move);
+                inventory.setStackInSlot(slot, placed);
+                remainder.shrink(move);
+                continue;
+            }
+            if (!ItemStack.isSameItemSameTags(existing, remainder)) {
+                continue;
+            }
+            int limit = Math.min(existing.getMaxStackSize(), inventory.getSlotLimit(slot));
+            int space = limit - existing.getCount();
+            if (space <= 0) {
+                continue;
+            }
+            int move = Math.min(space, remainder.getCount());
+            ItemStack merged = existing.copy();
+            merged.grow(move);
+            inventory.setStackInSlot(slot, merged);
+            remainder.shrink(move);
+        }
+        return remainder;
+    }
+
+    private enum ToolKind { HOE, AXE, SHEARS, TREETAP, NONE }
+
+    private static ToolKind toolKind(ItemStack stack) {
+        if (stack.isEmpty()) return ToolKind.NONE;
+        Item item = stack.getItem();
+        if (item instanceof HoeItem) return ToolKind.HOE;
+        if (item instanceof AxeItem) return ToolKind.AXE;
+        if (item instanceof ShearsItem) return ToolKind.SHEARS;
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
+        String path = id.getPath();
+        if (path.contains("treetap") || path.contains("tree_tap")) return ToolKind.TREETAP;
+        return ToolKind.NONE;
+    }
+
+    private static boolean isFarmTool(ItemStack stack) { return toolKind(stack) != ToolKind.NONE; }
+
+    private boolean hasSameToolTypeInAnotherSlot(int slot, ItemStack candidate) {
+        ToolKind kind = toolKind(candidate);
+        if (kind == ToolKind.NONE) return false;
+        for (int other = FIRST_TOOL_SLOT; other <= LAST_TOOL_SLOT; other++) {
+            if (other != slot && toolKind(inventory.getStackInSlot(other)) == kind) return true;
+        }
+        return false;
+    }
+
+    private int findToolSlot(ToolKind kind) {
+        for (int slot = FIRST_TOOL_SLOT; slot <= LAST_TOOL_SLOT; slot++) {
+            if (toolKind(inventory.getStackInSlot(slot)) == kind) return slot;
+        }
+        return -1;
+    }
+
+    private boolean hasHoe() { return findToolSlot(ToolKind.HOE) >= 0; }
+    private boolean hasAxe() { return findToolSlot(ToolKind.AXE) >= 0; }
+
+    private static boolean isFertilizer(ItemStack stack) {
+        if (stack.is(Items.BONE_MEAL)) return true;
+        if (stack.isEmpty()) return false;
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        String path = id.getPath().toLowerCase(java.util.Locale.ROOT);
+        return path.contains("fertilizer") || path.contains("fertiliser") || path.contains("bonemeal") || path.contains("bone_meal") || path.contains("compost");
+    }
+
+    private int findFertilizerSlot() {
+        for (int slot = FIRST_FERTILIZER_SLOT; slot <= LAST_FERTILIZER_SLOT; slot++) {
+            if (isFertilizer(inventory.getStackInSlot(slot))) return slot;
+        }
+        return -1;
+    }
+
+    private boolean tryFertilize(ServerLevel level, BlockPos pos) {
+        int slot = findFertilizerSlot();
+        if (slot < 0) return false;
+        BlockState state = level.getBlockState(pos);
+        boolean growable = state.getBlock() instanceof CropBlock
+                || state.getBlock() instanceof SaplingBlock
+                || state.getBlock() instanceof StemBlock
+                || state.is(BlockTags.SAPLINGS)
+                || state.is(FORGE_CROPS);
+        if (!growable) return false;
+        ItemStack fertilizer = inventory.getStackInSlot(slot);
+        if (!fertilizer.is(Items.BONE_MEAL)) return false;
+        if (!consumeEnergy(FERTILIZER_TRY_ENERGY)) return false;
+        ItemStack one = fertilizer.copy();
+        one.setCount(1);
+        if (!BoneMealItem.growCrop(one, level, pos)) return false;
+        // SkyFactory 3 used 80 RF per try and 160 RF for a successful action.
+        if (!consumeEnergy(FERTILIZER_ACTION_ENERGY - FERTILIZER_TRY_ENERGY)) return false;
+        inventory.extractItem(slot, 1, false);
+        clearNotification();
+        return true;
+    }
+
+    private void damageTool(ServerLevel serverLevel, int slot) {
+        if (slot < FIRST_TOOL_SLOT || slot > LAST_TOOL_SLOT) return;
+        ItemStack tool = inventory.getStackInSlot(slot);
+        if (tool.isEmpty() || !tool.isDamageableItem()) return;
+        ItemStack damaged = tool.copy();
+        if (damaged.hurt(1, serverLevel.random, null)) {
+            inventory.setStackInSlot(slot, ItemStack.EMPTY);
+        } else {
+            inventory.setStackInSlot(slot, damaged);
+        }
+    }
+
+    private List<ItemStack> getDropsUsingTool(ServerLevel level, BlockPos pos, BlockState state, int toolSlot) {
+        ItemStack tool = toolSlot >= 0 ? inventory.getStackInSlot(toolSlot).copy() : ItemStack.EMPTY;
+        return Block.getDrops(state, level, pos, level.getBlockEntity(pos), null, tool);
+    }
+
+    private boolean tryHarvestTaggedCrop(ServerLevel level, BlockPos pos, BlockState state) {
+        IntegerProperty ageProperty = findAgeProperty(state);
+        if (ageProperty == null) return false;
+        int current = state.getValue(ageProperty);
+        int minimum = ageProperty.getPossibleValues().stream().min(Integer::compareTo).orElse(0);
+        int maximum = ageProperty.getPossibleValues().stream().max(Integer::compareTo).orElse(current);
+        if (current < maximum) return false;
+        if (!consumeEnergy(CROP_ACTION_ENERGY)) return false;
+
+        List<ItemStack> drops = getDropsUsingTool(level, pos, state, findToolSlot(ToolKind.HOE));
+        level.setBlock(pos, state.setValue(ageProperty, minimum), Block.UPDATE_ALL);
+        storeDrops(level, pos, drops);
+        clearNotification();
+        return true;
+    }
+
+    private static IntegerProperty findAgeProperty(BlockState state) {
+        for (Property<?> property : state.getProperties()) {
+            if (property instanceof IntegerProperty integerProperty && "age".equals(property.getName())) {
+                return integerProperty;
+            }
+        }
+        return null;
+    }
+
+    private boolean consumeEnergy(int amount) {
+        if (energy.getEnergyStored() < amount) return false;
+        energy.removeEnergyInternal(amount, false);
+        return true;
+    }
+
+    private int getFarmRange() {
+        int tier = capacitorTier(inventory.getStackInSlot(CAPACITOR_SLOT));
+        return BASE_RANGE + Math.max(0, tier - 1) * 2;
+    }
+
+    private static int capacitorTier(ItemStack stack) {
+        if (stack.isEmpty()) return 1; // old machine behaved as a basic tier by default
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        if (!"enderio".equals(id.getNamespace())) return 0;
+        return switch (id.getPath()) {
+            case "basic_capacitor" -> 1;
+            case "double_layer_capacitor" -> 2;
+            case "octadic_capacitor" -> 3;
+            default -> 0;
+        };
+    }
+
+    private static boolean isPlantingSupply(ItemStack stack) {
+        Item item = stack.getItem();
+        if (item == Items.WHEAT_SEEDS || item == Items.CARROT || item == Items.POTATO
+                || item == Items.BEETROOT_SEEDS || item == Items.MELON_SEEDS || item == Items.PUMPKIN_SEEDS
+                || item == Items.NETHER_WART || item == Items.COCOA_BEANS
+                || item == Items.OAK_SAPLING || item == Items.SPRUCE_SAPLING || item == Items.BIRCH_SAPLING
