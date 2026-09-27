@@ -1,0 +1,203 @@
+                || item == Items.JUNGLE_SAPLING || item == Items.ACACIA_SAPLING || item == Items.DARK_OAK_SAPLING
+                || item == Items.CHERRY_SAPLING || item == Items.SUGAR_CANE || item == Items.CACTUS) {
+            return true;
+        }
+        return item instanceof BlockItem blockItem && isSupportedPlantBlock(blockItem.getBlock());
+    }
+
+    private static boolean isSupportedPlantBlock(Block block) {
+        return block instanceof CropBlock
+                || block instanceof StemBlock
+                || block instanceof SaplingBlock
+                || block instanceof SugarCaneBlock
+                || block instanceof CactusBlock
+                || block instanceof NetherWartBlock;
+    }
+
+    public MachineIOMode getSideMode(Direction direction) {
+        return sideModes.getOrDefault(direction, MachineIOMode.INPUT_OUTPUT);
+    }
+
+    public void cycleSideMode(Direction direction) {
+        sideModes.put(direction, getSideMode(direction).next());
+        setChanged();
+    }
+
+    public int getSideModeOrdinal(Direction direction) { return getSideMode(direction).ordinal(); }
+
+    private final class FarmingSidedItemHandler implements IItemHandler {
+        private final Direction side;
+        private FarmingSidedItemHandler(Direction side) { this.side = side; }
+        @Override public int getSlots() { return inventory.getSlots(); }
+        @Override public ItemStack getStackInSlot(int slot) { return inventory.getStackInSlot(slot); }
+        @Override public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
+            if (!getSideMode(side).allowsInput() || !isAutomationInputSlot(slot)) return stack;
+            return inventory.insertItem(slot, stack, simulate);
+        }
+        @Override public ItemStack extractItem(int slot, int amount, boolean simulate) {
+            if (!getSideMode(side).allowsOutput() || !isAutomationOutputSlot(slot)) return ItemStack.EMPTY;
+            return inventory.extractItem(slot, amount, simulate);
+        }
+        @Override public int getSlotLimit(int slot) { return inventory.getSlotLimit(slot); }
+        @Override public boolean isItemValid(int slot, ItemStack stack) {
+            return getSideMode(side).allowsInput() && isAutomationInputSlot(slot) && inventory.isItemValid(slot, stack);
+        }
+    }
+
+    private static boolean isAutomationInputSlot(int slot) {
+        return (slot >= FIRST_FERTILIZER_SLOT && slot <= LAST_FERTILIZER_SLOT)
+                || (slot >= FIRST_SUPPLY_SLOT && slot <= LAST_SUPPLY_SLOT) || slot == CAPACITOR_SLOT;
+    }
+    private static boolean isAutomationOutputSlot(int slot) { return slot >= FIRST_OUTPUT_SLOT && slot <= LAST_OUTPUT_SLOT; }
+
+    public boolean isSupplySlotLocked(int supplyIndex) {
+        return supplyIndex >= 0 && supplyIndex < supplySlotLocks.length
+                && supplySlotLocks[supplyIndex] != null && !supplySlotLocks[supplyIndex].isBlank();
+    }
+
+    public void toggleSupplySlotLocked(int supplyIndex) {
+        if (supplyIndex < 0 || supplyIndex >= supplySlotLocks.length) return;
+        if (isSupplySlotLocked(supplyIndex)) {
+            supplySlotLocks[supplyIndex] = "";
+            setNotification("Supply slot " + (supplyIndex + 1) + " unlocked");
+        } else {
+            ItemStack stack = inventory.getStackInSlot(FIRST_SUPPLY_SLOT + supplyIndex);
+            if (stack.isEmpty()) {
+                setNotification("Put a planting item in the slot before locking it");
+                return;
+            }
+            supplySlotLocks[supplyIndex] = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+            setNotification("Supply slot " + (supplyIndex + 1) + " locked");
+        }
+        setChanged();
+    }
+
+    public boolean isShowingRange() { return showRange; }
+
+    public void toggleShowRange() {
+        showRange = !showRange;
+        setChanged();
+    }
+
+    private void setNotification(String message) {
+        notification = message;
+    }
+
+    private void clearNotification() {
+        notification = "";
+    }
+
+    @Override
+    public InteractionResult onUse(Player player, InteractionHand hand) {
+        String status = "Farming Station — " + energy.getEnergyStored() + "/" + energy.getMaxEnergyStored()
+                + " FE, range " + getFarmRange()
+                + ", supplies " + countFilledSlots(FIRST_SUPPLY_SLOT, LAST_SUPPLY_SLOT) + "/4"
+                + ", output " + countFilledSlots(FIRST_OUTPUT_SLOT, LAST_OUTPUT_SLOT) + "/6"
+                + (notification.isEmpty() ? "" : ", " + notification);
+
+        if (!player.isShiftKeyDown()) {
+            if (!player.level().isClientSide && player instanceof ServerPlayer serverPlayer) {
+                NetworkHooks.openScreen(serverPlayer, this, worldPosition);
+            }
+            return InteractionResult.sidedSuccess(player.level().isClientSide);
+        }
+        return MachineInteractionUtil.insertOrExtract(player, hand, inventory, status);
+    }
+
+    @Override
+    public Component getDisplayName() {
+        return Component.translatable("container.loyacrowns_ender_legacy.farming_station");
+    }
+
+    @Override
+    public AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player player) {
+        return new FarmingStationMenu(containerId, playerInventory, this);
+    }
+
+    public ContainerData createMenuData() {
+        return new ContainerData() {
+            @Override
+            public int get(int index) {
+                return switch (index) {
+                    case 0 -> energy.getEnergyStored();
+                    case 1 -> energy.getMaxEnergyStored();
+                    case 2 -> getFarmRange();
+                    case 3 -> showRange ? 1 : 0;
+                    case 4 -> getRedstoneMode().ordinal();
+                    case 5 -> getSideModeOrdinal(Direction.DOWN);
+                    case 6 -> getSideModeOrdinal(Direction.UP);
+                    case 7 -> getSideModeOrdinal(Direction.NORTH);
+                    case 8 -> getSideModeOrdinal(Direction.SOUTH);
+                    case 9 -> getSideModeOrdinal(Direction.WEST);
+                    case 10 -> getSideModeOrdinal(Direction.EAST);
+                    case 11 -> isSupplySlotLocked(0) ? 1 : 0;
+                    case 12 -> isSupplySlotLocked(1) ? 1 : 0;
+                    case 13 -> isSupplySlotLocked(2) ? 1 : 0;
+                    case 14 -> isSupplySlotLocked(3) ? 1 : 0;
+                    default -> 0;
+                };
+            }
+
+            @Override
+            public void set(int index, int value) {
+                // Server-owned values; clients only receive them for display.
+            }
+
+            @Override
+            public int getCount() {
+                return 15;
+            }
+        };
+    }
+
+    private int countFilledSlots(int first, int last) {
+        int count = 0;
+        for (int i = first; i <= last; i++) {
+            if (!inventory.getStackInSlot(i).isEmpty()) count++;
+        }
+        return count;
+    }
+
+    @Override
+    public ItemStackHandler getInventory() {
+        return inventory;
+    }
+
+    @Override
+    protected void saveAdditional(CompoundTag tag) {
+        super.saveAdditional(tag);
+        tag.put("Inventory", inventory.serializeNBT());
+        tag.putInt("ScanIndex", scanIndex);
+        tag.putString("Notification", notification);
+        tag.putBoolean("ShowRange", showRange);
+        CompoundTag locks = new CompoundTag();
+        for (int i = 0; i < supplySlotLocks.length; i++) {
+            if (supplySlotLocks[i] != null && !supplySlotLocks[i].isBlank()) {
+                locks.putString("Slot" + i, supplySlotLocks[i]);
+            }
+        }
+        tag.put("SupplySlotLocks", locks);
+        CompoundTag sides = new CompoundTag();
+        for (Direction direction : Direction.values()) sides.putString(direction.getName(), getSideMode(direction).name());
+        tag.put("SideModes", sides);
+    }
+
+    @Override
+    public void load(CompoundTag tag) {
+        super.load(tag);
+        inventory.deserializeNBT(tag.getCompound("Inventory"));
+        scanIndex = tag.getInt("ScanIndex");
+        notification = tag.getString("Notification");
+        showRange = tag.getBoolean("ShowRange");
+        CompoundTag locks = tag.getCompound("SupplySlotLocks");
+        for (int i = 0; i < supplySlotLocks.length; i++) supplySlotLocks[i] = locks.getString("Slot" + i);
+        CompoundTag sides = tag.getCompound("SideModes");
+        for (Direction direction : Direction.values()) {
+            String saved = sides.getString(direction.getName());
+            if (!saved.isBlank()) {
+                try { sideModes.put(direction, MachineIOMode.valueOf(saved)); }
+                catch (IllegalArgumentException ignored) { sideModes.put(direction, MachineIOMode.INPUT_OUTPUT); }
+            }
+        }
+    }
+}
