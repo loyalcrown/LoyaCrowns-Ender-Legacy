@@ -1,0 +1,220 @@
+package com.loyacrown.enderlegacy.blockentity;
+
+import com.loyacrown.enderlegacy.registry.LegacyBlockEntities;
+import com.loyacrown.enderlegacy.util.MachineInteractionUtil;
+import com.loyacrown.enderlegacy.util.MachineIOMode;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.BoneMealItem;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.AxeItem;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.HoeItem;
+import net.minecraft.world.item.ShearsItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CocoaBlock;
+import net.minecraft.world.level.block.CactusBlock;
+import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.NetherWartBlock;
+import net.minecraft.world.level.block.SaplingBlock;
+import net.minecraft.world.level.block.StemBlock;
+import net.minecraft.world.level.block.SugarCaneBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerData;
+import net.minecraftforge.network.NetworkHooks;
+import com.loyacrown.enderlegacy.menu.FarmingStationMenu;
+import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
+import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.items.ItemStackHandler;
+import net.minecraftforge.items.IItemHandler;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayDeque;
+import java.util.HashSet;
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * A practical 1.20.1 recreation of the legacy Ender IO Farming Station.
+ *
+ * Slot layout mirrors Ender IO 3.1.193 as used by SkyFactory 3:
+ * 0-2 tools, 3-4 fertilizer, 5-8 planting supplies, 9-14 harvest output, 15 capacitor.
+ * Tool slots accept hoes, axes, shears and treetap-style tools; supply slots can
+ * be locked independently, and stronger capacitors increase the working radius.
+ */
+public class FarmingStationBlockEntity extends LegacyPoweredBlockEntity implements LegacyTickingBlockEntity,
+        LegacyInteractableBlockEntity, LegacyInventoryHolder, MenuProvider {
+    private static final int CROP_ACTION_ENERGY = 500;
+    private static final int AXE_ACTION_ENERGY = 1_000;
+    private static final int FERTILIZER_ACTION_ENERGY = 160;
+    private static final int FERTILIZER_TRY_ENERGY = 80;
+    private static final int BASE_RANGE = 3;
+    private static final TagKey<Block> FORGE_CROPS = TagKey.create(Registries.BLOCK, new ResourceLocation("forge", "crops"));
+
+    private static final int FIRST_TOOL_SLOT = 0;
+    private static final int LAST_TOOL_SLOT = 2;
+    private static final int FIRST_FERTILIZER_SLOT = 3;
+    private static final int LAST_FERTILIZER_SLOT = 4;
+    private static final int FIRST_SUPPLY_SLOT = 5;
+    private static final int LAST_SUPPLY_SLOT = 8;
+    private static final int FIRST_OUTPUT_SLOT = 9;
+    private static final int LAST_OUTPUT_SLOT = 14;
+    private static final int CAPACITOR_SLOT = 15;
+
+    private boolean showRange;
+    private final Map<Direction, MachineIOMode> sideModes = new EnumMap<>(Direction.class);
+    private final Map<Direction, LazyOptional<IItemHandler>> sideCapabilities = new EnumMap<>(Direction.class);
+    private final String[] supplySlotLocks = new String[LAST_SUPPLY_SLOT - FIRST_SUPPLY_SLOT + 1];
+
+    private final ItemStackHandler inventory = new ItemStackHandler(16) {
+        @Override
+        public boolean isItemValid(int slot, @NotNull ItemStack stack) {
+            if (slot >= FIRST_TOOL_SLOT && slot <= LAST_TOOL_SLOT) {
+                return isFarmTool(stack) && !hasSameToolTypeInAnotherSlot(slot, stack);
+            }
+            if (slot >= FIRST_FERTILIZER_SLOT && slot <= LAST_FERTILIZER_SLOT) {
+                return isFertilizer(stack);
+            }
+            if (slot >= FIRST_SUPPLY_SLOT && slot <= LAST_SUPPLY_SLOT) {
+                if (!isPlantingSupply(stack)) return false;
+                String lockedItem = supplySlotLocks[slot - FIRST_SUPPLY_SLOT];
+                return lockedItem == null || lockedItem.isBlank()
+                        || lockedItem.equals(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
+            }
+            if (slot >= FIRST_OUTPUT_SLOT && slot <= LAST_OUTPUT_SLOT) {
+                return false;
+            }
+            if (slot == CAPACITOR_SLOT) {
+                return capacitorTier(stack) > 0;
+            }
+            return false;
+        }
+
+        @Override
+        protected void onContentsChanged(int slot) {
+            setChanged();
+        }
+    };
+    private LazyOptional<ItemStackHandler> itemCapability = LazyOptional.empty();
+    private int tickCounter;
+    private int scanIndex;
+    private String notification = "";
+
+    public FarmingStationBlockEntity(BlockPos pos, BlockState state) {
+        super(LegacyBlockEntities.FARMING_STATION.get(), pos, state, 1_000_000, 4_000, 0);
+        for (Direction direction : Direction.values()) sideModes.put(direction, MachineIOMode.INPUT_OUTPUT);
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        itemCapability = LazyOptional.of(() -> inventory);
+        sideCapabilities.clear();
+        for (Direction direction : Direction.values()) {
+            sideCapabilities.put(direction, LazyOptional.of(() -> new FarmingSidedItemHandler(direction)));
+        }
+    }
+
+    @Override
+    public void invalidateCaps() {
+        super.invalidateCaps();
+        itemCapability.invalidate();
+        for (LazyOptional<IItemHandler> capability : sideCapabilities.values()) capability.invalidate();
+        sideCapabilities.clear();
+    }
+
+    @Override
+    public <T> @NotNull LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
+        if (cap == ForgeCapabilities.ITEM_HANDLER) {
+            if (side == null) return itemCapability.cast();
+            MachineIOMode mode = sideModes.getOrDefault(side, MachineIOMode.INPUT_OUTPUT);
+            if (mode == MachineIOMode.DISABLED) return LazyOptional.empty();
+            LazyOptional<IItemHandler> sided = sideCapabilities.get(side);
+            return sided == null ? LazyOptional.empty() : sided.cast();
+        }
+        return super.getCapability(cap, side);
+    }
+
+    @Override
+    public void serverTick() {
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        if (!isMachineEnabledByRedstone()) return;
+        if (!hasEmptyOutputSlot()) {
+            setNotification("Output buffer needs an empty slot");
+            return;
+        }
+        if (++tickCounter < 10) {
+            return;
+        }
+        tickCounter = 0;
+
+        int range = getFarmRange();
+        int diameter = range * 2 + 1;
+        int total = diameter * diameter;
+        for (int attempt = 0; attempt < 12; attempt++) {
+            int idx = Math.floorMod(scanIndex++, total);
+            int dx = (idx % diameter) - range;
+            int dz = (idx / diameter) - range;
+            BlockPos target = worldPosition.offset(dx, 0, dz);
+
+            if (tryHarvest(serverLevel, target)
+                    || tryFertilize(serverLevel, target)
+                    || tryPrepareSoil(serverLevel, target)
+                    || tryPlant(serverLevel, target)) {
+                setChanged();
+                break;
+            }
+        }
+    }
+
+    private boolean tryHarvest(ServerLevel serverLevel, BlockPos pos) {
+        BlockState state = serverLevel.getBlockState(pos);
+
+        if (state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state)) {
+            if (!consumeEnergy(CROP_ACTION_ENERGY)) return false;
+            List<ItemStack> drops = getDropsUsingTool(serverLevel, pos, state, findToolSlot(ToolKind.HOE));
+            serverLevel.setBlock(pos, crop.getStateForAge(0), Block.UPDATE_ALL);
+            storeDrops(serverLevel, pos, drops);
+            clearNotification();
+            return true;
+        }
+        if (state.is(Blocks.NETHER_WART) && state.getValue(NetherWartBlock.AGE) >= NetherWartBlock.MAX_AGE) {
+            if (!consumeEnergy(CROP_ACTION_ENERGY)) return false;
+            List<ItemStack> drops = getDropsUsingTool(serverLevel, pos, state, findToolSlot(ToolKind.HOE));
+            serverLevel.setBlock(pos, state.setValue(NetherWartBlock.AGE, 0), Block.UPDATE_ALL);
+            storeDrops(serverLevel, pos, drops);
+            clearNotification();
+            return true;
+        }
+        if (state.getBlock() instanceof CocoaBlock && state.getValue(CocoaBlock.AGE) >= CocoaBlock.MAX_AGE) {
+            if (!consumeEnergy(CROP_ACTION_ENERGY)) return false;
+            List<ItemStack> drops = getDropsUsingTool(serverLevel, pos, state, findToolSlot(ToolKind.HOE));
+            serverLevel.setBlock(pos, state.setValue(CocoaBlock.AGE, 0), Block.UPDATE_ALL);
+            storeDrops(serverLevel, pos, drops);
