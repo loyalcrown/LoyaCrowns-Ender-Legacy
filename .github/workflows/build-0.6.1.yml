@@ -45,7 +45,7 @@ jobs:
       - name: Apply 0.6.1 parity and modern UI patch
         shell: bash
         run: |
-          python patches/0.6.1/apply_parity_patch.py "$PROJECT_DIR"
+          python patches/0.6.1/apply_parity_patch_fixed.py "$PROJECT_DIR"
           grep -q '^mod_version=0.6.1-alpha$' "$PROJECT_DIR/gradle.properties"
           grep -q 'toggleSupplySlotLock' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/FarmingStationBlockEntity.java"
           grep -q 'toggleShowingRange' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/FarmingStationBlockEntity.java"
