@@ -1,0 +1,121 @@
+name: Build 0.6.2 Dimensional Transceiver Parity
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "dev/transceiver-parity-0.6.2" ]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
+
+      - name: Download validated 0.6.1 source snapshot
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/source-artifact
+          gh run download 36289773869 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name LoyalCrowns-Ender-Legacy-1.20.1-0.6.1-dev-source \
+            --dir /tmp/source-artifact
+          SOURCE_ZIP="$(find /tmp/source-artifact -type f -name '*0.6.1-dev-source.zip' -print -quit)"
+          test -n "$SOURCE_ZIP"
+          unzip -q "$SOURCE_ZIP"
+          PROJECT_DIR="$(find . -maxdepth 2 -type f -name gradle.properties -path '*0.6.1-worktree*' -printf '%h\n' | head -1)"
+          test -n "$PROJECT_DIR"
+          grep -q '^mod_version=0.6.1-alpha$' "$PROJECT_DIR/gradle.properties"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Apply 0.6.2 Dimensional Transceiver parity patch
+        shell: bash
+        run: |
+          python patches/0.6.2/apply_transceiver_parity_patch.py "$PROJECT_DIR"
+          grep -q '^mod_version=0.6.2-alpha$' "$PROJECT_DIR/gradle.properties"
+          grep -q 'listChannels' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/util/DimensionalTransceiverNetwork.java"
+          grep -q 'isMachineEnabledByRedstone' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/DimensionalTransceiverBlockEntity.java"
+          grep -q 'SideModes' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/blockentity/DimensionalTransceiverBlockEntity.java"
+          grep -q 'NEXT_CHANNEL_BUTTON_ID' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/menu/DimensionalTransceiverMenu.java"
+          grep -q 'previousChannelButton' "$PROJECT_DIR/src/main/java/com/loyacrown/enderlegacy/client/DimensionalTransceiverScreen.java"
+
+      - name: Prepare Forge build
+        shell: bash
+        run: |
+          python - "$PROJECT_DIR" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1])/'build.gradle'
+          p.write_text('\n'.join(line for line in p.read_text().splitlines() if 'com.enderio:enderio:' not in line and 'com.enderio:EnderIO:' not in line)+'\n')
+          PY
+
+      - name: Validate resources
+        shell: bash
+        run: |
+          python "$PROJECT_DIR/tools/validate_assets.py"
+          python - "$PROJECT_DIR" <<'PY'
+          from pathlib import Path
+          import json, sys
+          root=Path(sys.argv[1])/'src/main/resources'
+          count=0
+          for p in root.rglob('*'):
+              if p.suffix in {'.json','.mcmeta'}:
+                  json.loads(p.read_text())
+                  count += 1
+          print(f'Validated {count} JSON/mcmeta resources.')
+          PY
+
+      - name: Build 0.6.2
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          gradle --no-daemon clean build --stacktrace
+
+      - name: Validate 0.6.2 JAR
+        shell: bash
+        run: |
+          JAR="$(find "$PROJECT_DIR/build/libs" -maxdepth 1 -type f -name 'LoyalCrowns-Ender-Legacy-*.jar' ! -name '*sources*' ! -name '*dev*' -print -quit)"
+          test -n "$JAR"
+          jar tf "$JAR" > /tmp/jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/blockentity/DimensionalTransceiverBlockEntity.class' /tmp/jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/menu/DimensionalTransceiverMenu.class' /tmp/jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/client/DimensionalTransceiverScreen.class' /tmp/jar-contents.txt
+          grep -q 'com/loyacrown/enderlegacy/util/DimensionalTransceiverNetwork.class' /tmp/jar-contents.txt
+          unzip -p "$JAR" META-INF/mods.toml | grep -q 'version="0.6.2-alpha"'
+          cp "$JAR" "$GITHUB_WORKSPACE/LoyalCrowns-Ender-Legacy-1.20.1-0.6.2-alpha.jar"
+
+      - name: Package reconstructed 0.6.2 source
+        shell: bash
+        run: |
+          cp -R "$PROJECT_DIR" LoyalCrowns-Ender-Legacy-0.6.2-worktree
+          rm -rf LoyalCrowns-Ender-Legacy-0.6.2-worktree/build LoyalCrowns-Ender-Legacy-0.6.2-worktree/.gradle
+          zip -qr LoyalCrowns-Ender-Legacy-1.20.1-0.6.2-dev-source.zip LoyalCrowns-Ender-Legacy-0.6.2-worktree
+
+      - name: Upload playable 0.6.2 jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: LoyalCrowns-Ender-Legacy-1.20.1-0.6.2-alpha
+          path: LoyalCrowns-Ender-Legacy-1.20.1-0.6.2-alpha.jar
+          if-no-files-found: error
+
+      - name: Upload 0.6.2 source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: LoyalCrowns-Ender-Legacy-1.20.1-0.6.2-dev-source
+          path: LoyalCrowns-Ender-Legacy-1.20.1-0.6.2-dev-source.zip
+          if-no-files-found: error
